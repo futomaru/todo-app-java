@@ -1,0 +1,45 @@
+# ビルド成功とテスト通過を自動検証するCIワークフロー
+name: CI
+
+# main への push、および main 宛ての PR 作成時に実行
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # build.gradle の toolchain (Java 25) と揃える
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      # Gradle 依存とビルドキャッシュを保持し、2回目以降のCIを高速化
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Linux ランナー上で gradlew を実行可能にする
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # build タスクはコンパイル・テスト・JAR生成を含むため、これ1つで両方を検証できる
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      # 失敗時のデバッグのためテストレポートを保存
+      # if: always() でビルド失敗時もアーティファクトとして取得可能にする
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: build/reports/tests/test
