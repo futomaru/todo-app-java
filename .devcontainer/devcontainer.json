@@ -1,0 +1,43 @@
+{
+  "name": "todo-app-java",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "remoteUser": "user",
+  "forwardPorts": [8080],
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/home/user/.claude,type=bind,consistency=cached",
+    "source=todo-app-gradle-cache,target=/home/user/.gradle,type=volume"
+  ],
+  "containerEnv": {
+    "DISABLE_AUTOUPDATER": "1"
+  },
+  "updateRemoteUserUID": true,
+  "postCreateCommand": "sudo rm -rf /workspace/.gradle && sudo chown -R user:user /home/user/.gradle && ./gradlew --no-daemon dependencies",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-ceintl.vscode-language-pack-ja",
+        "vscjava.vscode-java-pack",
+        "vmware.vscode-boot-dev-pack",
+        "donjayamanne.githistory"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "java.server.launchMode": "Standard",
+        "java.configuration.runtimes": [
+          {
+            "name": "JavaSE-25",
+            "path": "/opt/java/openjdk",
+            "default": true
+          }
+        ]
+      }
+    }
+  }
+}
