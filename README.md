@@ -1,63 +1,63 @@
 # todo-app-java
 
-A learning project for building a Todo REST API with Java, Spring Boot, and Gradle.
+Java・Spring Boot・Gradle を学ぶための Todo REST API 学習プロジェクトです。
 
-## Tech Stack
+## 技術スタック
 
-| Component | Technology |
+| 項目 | 技術 |
 |---|---|
-| Language | Java 25 |
-| Framework | Spring Boot 4.0.x / Spring Framework 7.0 |
-| DB access | MyBatis |
-| Database | H2 (file-based) |
-| Build | Gradle 9 |
+| 言語 | Java 25 |
+| フレームワーク | Spring Boot 4.0.x / Spring Framework 7.0 |
+| DB アクセス | MyBatis |
+| データベース | H2（ファイルベース） |
+| ビルド | Gradle 9 |
 
-## Architecture
+## アーキテクチャ
 
 ```
 TodoController → TodoService → TodoMapper → H2
 ```
 
-## Getting Started
+## セットアップ
 
-**Requires:** JDK 25
+**必要環境:** JDK 25
 
 ```bash
 ./gradlew bootRun
 ```
 
-The application starts at <http://localhost:8080>.
+起動後、<http://localhost:8080> でアクセスできます。
 
-## Build & Test
+## ビルド・テスト
 
 ```bash
-./gradlew build   # compile and package
-./gradlew test    # run tests
+./gradlew build   # コンパイル・パッケージング
+./gradlew test    # テスト実行
 ```
 
-## Project Layout
+## ディレクトリ構成
 
 ```
 src/
   main/
-    java/       # Application source (controller, service, mapper, entity, dto, exception)
-    resources/  # application.properties, schema.sql, static assets
+    java/       # アプリケーションコード（controller / service / mapper / entity / dto / exception）
+    resources/  # application.properties・schema.sql・静的ファイル
   test/
-    java/       # Unit and integration tests
+    java/       # ユニットテスト・統合テスト
 doc/
-  api.yaml            # OpenAPI specification
-  architecture.md     # Architecture guidelines
-  design.md           # Design decisions
-  coding-standards.md # Coding conventions
-  testing-guide.md    # Testing approach
-  CONTRIBUTING.md     # Contribution guide
+  api.yaml            # OpenAPI 仕様
+  architecture.md     # アーキテクチャガイドライン
+  design.md           # 設計方針
+  coding-standards.md # コーディング規約
+  testing-guide.md    # テスト方針
+  CONTRIBUTING.md     # コントリビューションガイド
 ```
 
-## Documentation
+## ドキュメント
 
-- [Architecture](doc/architecture.md)
-- [Design](doc/design.md)
-- [API Spec](doc/api.yaml)
-- [Coding Standards](doc/coding-standards.md)
-- [Testing Guide](doc/testing-guide.md)
-- [Contributing](doc/CONTRIBUTING.md)
+- [アーキテクチャ](doc/architecture.md)
+- [設計](doc/design.md)
+- [API 仕様](doc/api.yaml)
+- [コーディング規約](doc/coding-standards.md)
+- [テストガイド](doc/testing-guide.md)
+- [コントリビューション](doc/CONTRIBUTING.md)
