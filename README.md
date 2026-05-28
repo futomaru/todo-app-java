@@ -1,6 +1,6 @@
 # todo-app-java
 
-Java・Spring Boot・MyBatis・H2 を使った Todo アプリの学習用プロジェクトです。
+Java・Spring Boot・MyBatis・H2 を使った Todo REST API の学習用プロジェクトです。
 
 ## 技術スタック
 
@@ -26,10 +26,10 @@ Java・Spring Boot・MyBatis・H2 を使った Todo アプリの学習用プロ�
 
 ```bash
 ./gradlew build  # ビルド + テスト
-./gradlew test   # テストのみ実行
+./gradlew test   # テスト実行
 ```
 
-## 現在の構成
+## ディレクトリ構成
 
 ```text
 src/
@@ -48,8 +48,8 @@ doc/
   design.md
   coding-standards.md
   testing-guide.md
-  api.yaml         # 準備中
-  CONTRIBUTING.md  # 準備中
+  api.yaml        # 準備中
+  CONTRIBUTING.md # 準備中
 ```
 
 ## ドキュメント
