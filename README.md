@@ -1,6 +1,6 @@
 # todo-app-java
 
-Java・Spring Boot・Gradle を学ぶための Todo REST API 学習プロジェクトです。
+Java・Spring Boot・MyBatis・H2 を使った Todo アプリの学習用プロジェクトです。
 
 ## 技術スタック
 
@@ -12,52 +12,51 @@ Java・Spring Boot・Gradle を学ぶための Todo REST API 学習プロジェ�
 | データベース | H2（ファイルベース） |
 | ビルド | Gradle 9 |
 
-## アーキテクチャ
-
-```
-TodoController → TodoService → TodoMapper → H2
-```
-
 ## セットアップ
 
-**必要環境:** JDK 25
+必要環境: JDK 25
 
 ```bash
 ./gradlew bootRun
 ```
 
-起動後、<http://localhost:8080> でアクセスできます。
+起動後、<http://localhost:8080> にアクセスできます。
 
 ## ビルド・テスト
 
 ```bash
-./gradlew build   # ビルド + テスト
-./gradlew test    # テスト実行
+./gradlew build  # ビルド + テスト
+./gradlew test   # テストのみ実行
 ```
 
-## ディレクトリ構成
+## 現在の構成
 
-```
+```text
 src/
   main/
-    java/       # アプリケーションコード（controller / service / mapper / entity / dto / exception）
-    resources/  # application.properties・schema.sql・静的ファイル
+    java/io/github/futomaru/todoapp/
+      TodoappApplication.java
+      entity/Todo.java
+    resources/
+      application.properties
+      schema.sql
   test/
-    java/       # ユニットテスト・統合テスト
+    java/io/github/futomaru/todoapp/
+      TodoappApplicationTests.java
 doc/
-  api.yaml            # OpenAPI 仕様
-  architecture.md     # アーキテクチャガイドライン
-  design.md           # 設計方針
-  coding-standards.md # コーディング規約
-  testing-guide.md    # テスト方針
-  CONTRIBUTING.md     # コントリビューションガイド
+  architecture.md
+  design.md
+  coding-standards.md
+  testing-guide.md
+  api.yaml         # 準備中
+  CONTRIBUTING.md  # 準備中
 ```
 
 ## ドキュメント
 
 - [アーキテクチャ](doc/architecture.md)
 - [設計](doc/design.md)
-- [API 仕様](doc/api.yaml)
 - [コーディング規約](doc/coding-standards.md)
 - [テストガイド](doc/testing-guide.md)
-- [コントリビューション](doc/CONTRIBUTING.md)
+- [API 仕様（準備中）](doc/api.yaml)
+- [コントリビューション（準備中）](doc/CONTRIBUTING.md)
