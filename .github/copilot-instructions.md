@@ -1,22 +1,49 @@
 # Copilot Review Instructions
 
-学習目的の Spring Boot + MyBatis REST API（Todoアプリ）です。
-プルリクエストのレビューでは以下を重点的に確認してください。
+## プロジェクト概要
 
-## プロジェクト構成
+学習目的の Todo 管理 REST API。Spring Boot + MyBatis + H2 によるレイヤードアーキテクチャの理解を目的とする。
+
+## アーキテクチャ
+
+シンプルなレイヤードアーキテクチャ。
 
 ```
-TodoController → TodoService → TodoMapper → H2
+Controller → Service → Mapper → H2
+                ↓
+          Entity / DTO（横断利用）
 ```
+
+| レイヤー | 責務 |
+| --- | --- |
+| Controller | HTTP マッピング、バリデーション委譲、ステータスコード組み立て |
+| Service | ユースケース、`@Transactional` 境界、Entity↔DTO 変換、例外スロー |
+| Mapper | MyBatis による SQL 実行（`@Select` / `@Insert` など） |
+| Entity | DB と対応する可変 POJO |
+| DTO | API 入出力（不変 record） |
 
 フロントエンド: `src/main/resources/static/`（Vanilla JS SPA）
+
+## 技術スタック
+
+| 項目 | 技術 |
+| --- | --- |
+| 言語 | Java 25 |
+| フレームワーク | Spring Boot 4.0.x / Spring Framework 7.0 |
+| Web 層 | Spring MVC |
+| DB アクセス | MyBatis |
+| DB | H2（file-based） |
+| バリデーション | Jakarta Bean Validation |
+| ボイラープレート削減 | Lombok |
+| テスト | JUnit 5 / Mockito / `@WebMvcTest` / `@MybatisTest` |
+| ビルド | Gradle 9 |
 
 ## 重点レビュー項目
 
 - **責務分離**: Controller / Service / Mapper の役割が混在していないか
-- **ライブラリの活用**: LombokやMybatis, Springの機能を適切に利用しているか
-- **Spring**: DIの活用（`@Autowired` ではなくコンストラクタインジェクションを推奨）など。Springのベストプラクティスに沿っているか
-- **命名・可読性**: 意図が読み取れる命名か、不要なコメントがないか。コードは誰が見ても理解しやすいものになっているか。
+- **ライブラリの活用**: Lombok・MyBatis・Spring の機能を適切に利用しているか
+- **Spring**: DI の活用（`@Autowired` ではなくコンストラクタインジェクションを推奨）など、ベストプラクティスに沿っているか
+- **命名・可読性**: 意図が読み取れる命名か、不要なコメントがないか。誰が見ても理解しやすいか
 - **テスト**: 変更箇所に対応するテストがあり、境界値・異常系も考慮されているか
 
 ## レビューのトーン
