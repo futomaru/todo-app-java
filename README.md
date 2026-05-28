@@ -31,7 +31,7 @@ TodoController → TodoService → TodoMapper → H2
 ## ビルド・テスト
 
 ```bash
-./gradlew build   # コンパイル・パッケージング
+./gradlew build   # ビルド + テスト
 ./gradlew test    # テスト実行
 ```
 
