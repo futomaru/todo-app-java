@@ -1,6 +1,8 @@
 # todo-app-java
 
 Java・Spring Boot・MyBatis・H2 を使った Todo REST API の学習用プロジェクトです。
+TodoMVC 相当のコア機能（追加・編集・完了切替・削除・完了フィルター・完了済み一括削除）に絞った
+**MVP（最小機能版）** として実装します。スコープの詳細は [doc/design.md §1.1](doc/design.md) を参照。
 
 ## 技術スタック
 
@@ -48,7 +50,7 @@ doc/
   design.md
   coding-standards.md
   testing-guide.md
-  api.yaml        # 準備中
+  api.yaml
   CONTRIBUTING.md # 準備中
 ```
 
@@ -58,5 +60,5 @@ doc/
 - [設計](doc/design.md)
 - [コーディング規約](doc/coding-standards.md)
 - [テストガイド](doc/testing-guide.md)
-- [API 仕様（準備中）](doc/api.yaml)
+- [API 仕様（OpenAPI 3.0）](doc/api.yaml)
 - [コントリビューション（準備中）](doc/CONTRIBUTING.md)

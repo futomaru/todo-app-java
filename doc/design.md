@@ -9,6 +9,33 @@ Spring MVC を用いた REST API 形式の TODO 管理バックエンドアプ�
 これらのバージョンで利用可能な新機能（`ProblemDetail`、Virtual Threads、`record` DTO、Text Blocks 等）
 を積極的に採用する。
 
+### 1.1 スコープ: MVP (Minimum Viable Product)
+
+本アプリは **学習目的の MVP（最小機能版）** として位置付ける。
+「Todo アプリとして最低限機能する」ことを完成の基準とし、
+**TodoMVC 相当のコア機能セット** にスコープを絞る：
+
+- タスクの追加 / 一覧表示 / 1件取得
+- タスクの編集（タイトル・説明・完了フラグ）
+- タスクの削除
+- 完了状態でのフィルター表示
+- 完了済みタスクの一括削除（"Clear completed"）
+
+以下は **意図的にスコープ外** とする（学習対象が拡散しないようにするため）：
+
+| 機能 | 除外理由 |
+|------|---------|
+| 期限・優先度・カテゴリ | データモデルが膨らみ、設計判断の論点がブレる |
+| 並び替え（`?sort=...`） | `ORDER BY id`（挿入順）で Todo として困らない |
+| ページング | 個人 Todo は数十件規模を想定。MVP では不要 |
+| 検索（`?q=...`） | 件数が少なければ画面スクロールで十分 |
+| 認証・マルチユーザー | バックエンド設計学習の主題から外れる |
+
+> **MVP として定義する意義**: 「完成の基準」を最初に固定することで、
+> 「あれもこれも」と機能追加して未完成のまま塩漬けになるのを防ぐ。
+> 上記コア機能が動いた時点で **「完成」と宣言してよい**。
+> 拡張機能はそれぞれ独立した学習テーマとして、完成後に追加する。
+
 ---
 
 ## 2. 技術スタック
@@ -252,6 +279,9 @@ public interface TodoMapper {
 
     @Delete("DELETE FROM todos WHERE id = #{id}")
     void deleteById(@Param("id") Long id);
+
+    @Delete("DELETE FROM todos WHERE completed = TRUE")
+    int deleteCompleted();
 }
 ```
 
@@ -260,6 +290,12 @@ public interface TodoMapper {
 > - `map-underscore-to-camel-case=true` 設定により `created_at` → `createdAt` が自動マッピングされる。
 > - `Optional<Todo>` 戻り値は MyBatis 3.5+ 以降サポート。**戻り値専用** に使い、引数やフィールドには使わないのが原則。
 > - SQL は Java 25 の **Text Blocks** (`"""..."""`) で記述すると複数行 SQL の可読性が高まる。
+> - `deleteCompleted` は **完了フラグを条件にした集合削除**。戻り値 `int` は MyBatis の標準仕様で、
+>   削除された行数が返る（0 件でも例外にならない）。Service / Controller でこの値を使うかは
+>   設計判断（本アプリではログ用途のみで API レスポンスには含めない。理由は §6.3 参照）。
+> - `deleteCompleted` を `deleteByCompleted(boolean)` のように **パラメータ化しなかった理由**:
+>   `?completed=false`（未完了をすべて削除）は実運用で誤操作リスクが高く、UI からも公開しないため、
+>   メソッドレベルで「完了済みだけを消す」と意図を固定し、SQL リテラルで `TRUE` を埋め込む方が安全。
 
 ---
 
@@ -275,7 +311,8 @@ Base URL: `http://localhost:8080/api/v1/todos`
 | `GET` | `/api/v1/todos/{id}` | 1件取得 | 200 |
 | `POST` | `/api/v1/todos` | 新規作成 | 201 |
 | `PATCH` | `/api/v1/todos/{id}` | 部分更新（指定フィールドのみ） | 200 |
-| `DELETE` | `/api/v1/todos/{id}` | 削除 | 204 |
+| `DELETE` | `/api/v1/todos/{id}` | 削除（単一） | 204 |
+| `DELETE` | `/api/v1/todos?completed=true` | 完了済みを一括削除 | 204 |
 
 > **`PUT` ではなく `PATCH`** を採用する理由：null フィールドを無視して指定分だけ更新する操作は
 > REST セマンティクス上 `PATCH` が正しい（`PUT` は本来「リソース全体の置換」）。
@@ -370,6 +407,36 @@ Base URL: `http://localhost:8080/api/v1/todos`
 > HTTP の冪等性（複数回呼び出しても結果が同じ）を厳密に重視するなら 204 を返す設計もあり得るが、
 > 学習目的では「リソースの存在チェック → 例外スロー → `@ExceptionHandler` で 404 変換」という
 > Spring の典型フローを GET と同じ形で体験できる方を優先する。
+
+#### DELETE `/api/v1/todos?completed=true`
+```
+クエリパラメータ: completed (必須、本 MVP では true のみ受け付ける)
+
+レスポンス 204: (ボディなし。マッチ 0 件でも 204)
+レスポンス 400: completed が未指定 / true 以外の場合の ProblemDetail
+```
+
+> **設計判断 1 — パス形式の選択**: 「完了済みを一括削除」を表現する方法は複数あり得る：
+>
+> | 案 | 例 | 評価 |
+> |---|---|---|
+> | A. クエリフィルター付き DELETE | `DELETE /api/v1/todos?completed=true` | **採用**。GET の `?completed=...` と対称で「同じフィルターで取得 → 削除」というメンタルモデルが一貫する |
+> | B. サブリソース | `DELETE /api/v1/todos/completed` | 意図は明確だが、`completed` がリソース名なのか状態名なのか曖昧。フィルターが増えると破綻 |
+> | C. アクション風エンドポイント | `POST /api/v1/todos/clear-completed` | REST セマンティクスから外れる（削除を POST で表現）。学習教材としては避けたい |
+>
+> **設計判断 2 — マッチ 0 件でも 204 を返す**: 単一 DELETE が 404 を返すのと対照的に、
+> コレクション削除では「条件にマッチしたものをすべて消す」という操作の性質上、
+> マッチ 0 件は **エラーではなく正常な空集合操作**。冪等性（2 回呼んでも同じ状態に収束）も自然に満たされる。
+> この **「単一リソース DELETE」と「コレクション DELETE」のエラー意味論の違い** は重要な学習論点。
+>
+> **設計判断 3 — レスポンスボディに削除件数を含めない**: 「削除件数 N を返す」設計もあり得るが、
+> 本 MVP のフロントエンドは削除後に一覧を再取得するため不要。
+> 「ボディなし = 204」の慣習を崩さない方を優先する。必要になった時点で 200 + ボディに切り替える。
+>
+> **設計判断 4 — `?completed=false` は受け付けない**: 形式的には「未完了をすべて削除」と
+> 解釈可能だが、これは誤操作リスクが極めて高く、UI からも公開しない機能。
+> 「`completed` パラメータは必須かつ `true` のみ許可」と仕様で明示し、それ以外は 400 で弾く。
+> （Mapper メソッドを `deleteCompleted()` と固定名にしているのも同じ理由 — §5.5 参照）
 
 ---
 
@@ -492,6 +559,7 @@ distributionUrl=https\://services.gradle.org/distributions/gradle-9.5.1-bin.zip
 | 完了トグル | チェックボックスで PATCH（`completed` の反転） |
 | TODO 削除 | 削除ボタンで DELETE |
 | 完了フィルター | 「全件 / 未完了 / 完了」タブで GET `?completed=` |
+| 完了済み一括削除 | 「完了済みを削除」ボタンで DELETE `?completed=true` |
 
 ### 10.3 app.js 構成
 
@@ -502,6 +570,7 @@ loadTodos(filter)    ← GET    /api/v1/todos[?completed=]
 createTodo(title)    ← POST   /api/v1/todos
 toggleTodo(id, todo) ← PATCH  /api/v1/todos/{id}
 deleteTodo(id)       ← DELETE /api/v1/todos/{id}
+clearCompleted()     ← DELETE /api/v1/todos?completed=true
 renderTodos(list)    ← DOM 更新
 ```
 
@@ -556,8 +625,11 @@ curl -X PATCH http://localhost:8080/api/v1/todos/1 \
   -H "Content-Type: application/json" \
   -d '{"completed":true}'
 
-# 6. 削除
+# 6. 削除（単一）
 curl -X DELETE http://localhost:8080/api/v1/todos/1
+
+# 7. 完了済みを一括削除（マッチ 0 件でも 204）
+curl -X DELETE "http://localhost:8080/api/v1/todos?completed=true"
 
 # H2 コンソール（ブラウザ、開発専用）
 # URL: http://localhost:8080/h2-console
