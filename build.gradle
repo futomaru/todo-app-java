@@ -39,7 +39,7 @@ tasks.named('test') {
 spotless {
 	java {
 		target 'src/**/*.java'
-		googleJavaFormat()
+		googleJavaFormat('1.35.0')
 		removeUnusedImports()
 		formatAnnotations()
 		trimTrailingWhitespace()
