@@ -38,27 +38,28 @@ pattern matching for `instanceof`／`switch` 等）を積極的に採用する�
 
 ---
 
-## 2. 技術スタック
+## 2. 技術スタック（採用理由）
 
-| 項目 | 採用技術 | 理由 |
-|------|----------|------|
-| 言語 | Java 25 | プロジェクト指定（`record`、Text Blocks、pattern matching を活用） |
-| フレームワーク | Spring Boot 4.1.x + **Spring MVC** | DispatcherServlet ベースの標準的 Web レイヤー |
-| コアフレームワーク | Spring Framework **7.1** | Spring Boot 4.1 に同梱；Jakarta EE 11 ベース |
-| ビルドツール | Gradle **9** | プロジェクト指定 |
-| データベース | H2 (file-based) | 組み込みDB、再起動後もデータ保持 |
-| ORM | **MyBatis** (mybatis-spring-boot-starter 4.0.x) | SQL を明示的に記述、シンプルな CRUD に適している |
-| バリデーション | Jakarta Bean Validation | `@NotBlank` / `@Size` 等のアノテーションで入力検証 |
-| エラーレスポンス | **`ProblemDetail`** (RFC 7807) | Spring Framework 6 で導入、7.1 でも標準。`@RestControllerAdvice` で集約 |
-| 並行処理 | **Virtual Threads** | JDK 21 で GA。`spring.threads.virtual.enabled=true` の 1 行で有効化 |
-| ボイラープレート削減 | **Lombok** | Entity の `getter`/`setter` を `@Getter`/`@Setter` で生成（DTO record には不要） |
-| フロントエンド | HTML / CSS / Vanilla JS | ビルドツール不要・Spring Boot の静的ファイル配信で提供 |
+> 技術一覧の要約表は [architecture.md](architecture.md#技術スタック要約) を参照。本節は **採用理由** に絞る。
+
+| 項目 | 採用技術 | 採用理由 |
+|------|----------|---------|
+| 言語 | Java 25 | プロジェクト指定。`record` / Text Blocks / pattern matching を学習対象として活用 |
+| フレームワーク | Spring Boot 4.1.x + Spring MVC | DispatcherServlet ベースの標準的 Web レイヤー |
+| コアフレームワーク | Spring Framework 7.1 | Spring Boot 4.1 に同梱、Jakarta EE 11 ベース |
+| データベース | H2 (file-based) | 組み込み DB、再起動後もデータが残るため学習で扱いやすい |
+| ORM | MyBatis | SQL を明示的に書ける。シンプルな CRUD に適し、隠蔽が少ないため何が起きているか理解しやすい |
+| エラーレスポンス | `ProblemDetail`（RFC 7807） | Spring Framework 6 で導入された標準。`@RestControllerAdvice` で集約しやすい |
+| 並行処理 | Virtual Threads | JDK 21 で GA。`spring.threads.virtual.enabled=true` で有効化できる |
+| null 表現 | JSpecify（`@Nullable`） | Spring Framework 7 が公式採用。`jakarta.annotation.@Nullable` からの移行先 |
+| ボイラープレート削減 | Lombok | Entity の getter/setter/コンストラクタ生成（DTO record には不要） |
+| フロントエンド | HTML / CSS / Vanilla JS | ビルドツール不要、Spring Boot の静的配信で完結 |
 
 ### 2.1 主な学習ポイント
 
 - **JDK 25**: `record` を DTO に採用し、不変オブジェクト（DTO）と可変 POJO（Entity）の使い分けを学ぶ。SQL は **Text Blocks**（Java 15 で正式機能化）で記述。`instanceof` / `switch` の pattern matching（Java 16 / 21 で正式機能化）も必要に応じて活用する。
 - **Spring Framework 7.1**: `ProblemDetail` ベースのエラーハンドリング、Virtual Threads サポート、Jakarta EE 11（`jakarta.*` 名前空間）が前提。
-- **Spring Boot 4.1**: 自動構成、`@Transactional` 境界、テスト用スライス（`@WebMvcTest` / `@MybatisTest`）の使い分け。テストでの mock 注入は `@MockitoBean`（Spring Boot 3.4 で導入された `@MockBean` の後継）を用いる。
+- **Spring Boot 4.1 / Spring Framework 7.1**: 自動構成、`@Transactional` 境界、テスト用スライス（`@MybatisTest`）の使い分け。Web 層テストには Spring Framework 7 で導入された **`RestTestClient`** を standalone モードで用いる（詳細は §11 参照）。
 
 ---
 
@@ -98,61 +99,35 @@ GET /                       → ResourceHttpRequestHandler
 
 ### 3.2 レイヤー責務
 
-| レイヤー | クラス | 責務 |
-|---------|--------|------|
-| Controller | `TodoController` | HTTP メソッド・パスのマッピング、DTO 変換、バリデーション委譲 |
-| Service | `TodoService` | ビジネスルール、`@Transactional` 制御、`Clock` を用いた `created_at`/`updated_at` 設定、エンティティ↔DTO 変換、例外スロー |
-| Mapper | `TodoMapper` | `@Mapper` インターフェース＋ SQL アノテーションで DB CRUD |
-| Entity | `Todo` | DB テーブルと対応する POJO（MyBatis が setter で値を注入するため可変クラス） |
-| DTO | `TodoCreateRequest` / `TodoUpdateRequest` / `TodoResponse` | API の入出力形式定義（**Java `record` で不変に定義**）。Entity ↔ DTO の変換は DTO 側に static factory（例: `TodoResponse.from(Todo)`）として定義し、Service から呼び出す。 |
-| Exception | `TodoNotFoundException` / `GlobalExceptionHandler` | カスタム例外と `ProblemDetail` への変換 |
+| レイヤー | クラス | 責務 | 根拠 |
+|---------|--------|------|------|
+| Controller | `TodoController` | HTTP メソッド・パスのマッピング、`@Valid` 委譲、ステータスコード組み立て | Web プロトコルの関心事を Service に持ち込まない |
+| Service | `TodoService` | ビジネスルール、`@Transactional` 制御、`Clock` を用いた `created_at`/`updated_at` 設定、Entity ↔ DTO 変換、例外スロー | Web プロトコルにも DB アクセス手段にも依存しない中心層 |
+| Mapper | `TodoMapper` | `@Mapper` インターフェース＋ SQL アノテーションで DB CRUD | SQL を明示的に書き、Java での分岐・加工をしない |
+| Entity | `Todo` | DB テーブルと対応する POJO（MyBatis が setter で値を注入するため可変クラス） | フレームワーク（MyBatis）の制約と整合 |
+| DTO | `TodoCreateRequest` / `TodoUpdateRequest` / `TodoResponse` | API の入出力形式定義（**Java `record` で不変**）。Entity ↔ DTO 変換は DTO 側の static factory（例: `TodoResponse.from(Todo)`）に集約 | API 境界の不変性表現 |
+| Exception | `TodoNotFoundException` / `GlobalExceptionHandler` | カスタム例外と `ProblemDetail` への変換 | 業務例外を HTTP レスポンスに変換する責務を 1 箇所に集中 |
 
-> **トランザクション境界の指針**: 読み取り専用メソッド（`findAll` / `findById` 等）には
-> `@Transactional(readOnly = true)` を付与し、書き込みを伴うメソッドには `@Transactional` を付ける。
-> `readOnly = true` は JPA では flush 抑制の最適化、MyBatis でも JDBC ドライバへヒントが渡るほか、
-> 「意図の明示」というドキュメント効果が大きい（典型的な Spring 慣習）。
+> **トランザクション境界の指針**: `TodoService` のクラス級に `@Transactional(readOnly = true)` を付け、
+> 書き込みメソッド（`create` / `update` / `delete` / `deleteCompleted`）のみメソッド級で `@Transactional` を上書きする。
+> 「**デフォルトは安全（readOnly）、書き込みメソッドが明示的に目立つ**」設計になる。
+> `readOnly = true` は MyBatis でも JDBC ドライバへヒントが渡るほか、「意図の明示」というドキュメント効果が大きい。
 
 ---
 
 ## 4. プロジェクト構成
 
+ディレクトリ構成（パッケージレイアウト）は [architecture.md](architecture.md#ディレクトリ構成) に一元化。
+本書ではテスト構成のみ補足する：
+
 ```
-todoapp/
-├── build.gradle
-├── settings.gradle
-├── doc/
-│   └── design.md                          ← 本ドキュメント
-├── src/main/
-│   ├── java/io/github/futomaru/todoapp/
-│   │   ├── TodoappApplication.java         # Spring Boot エントリーポイント
-│   │   ├── controller/
-│   │   │   └── TodoController.java         # Spring MVC コントローラー
-│   │   ├── service/
-│   │   │   └── TodoService.java            # ビジネスロジック層
-│   │   ├── mapper/
-│   │   │   └── TodoMapper.java             # MyBatis @Mapper インターフェース
-│   │   ├── entity/
-│   │   │   └── Todo.java                   # POJO エンティティ（mutable）
-│   │   ├── dto/
-│   │   │   ├── TodoCreateRequest.java      # 作成リクエスト DTO（record）
-│   │   │   ├── TodoUpdateRequest.java      # 更新リクエスト DTO（record）
-│   │   │   └── TodoResponse.java           # レスポンス DTO（record）
-│   │   └── exception/
-│   │       ├── TodoNotFoundException.java  # 404 用カスタム例外
-│   │       └── GlobalExceptionHandler.java # @RestControllerAdvice
-│   └── resources/
-│       ├── application.properties          # DB・MyBatis・Virtual Threads 設定
-│       ├── schema.sql                      # テーブル DDL（起動時に自動実行）
-│       └── static/
-│           ├── index.html                  # フロントエンド UI
-│           ├── app.js                      # fetch() による REST 呼び出し
-│           └── style.css                   # スタイル
-└── src/test/
-    └── java/io/github/futomaru/todoapp/
-        ├── controller/TodoControllerTest.java  # @WebMvcTest
-        ├── service/TodoServiceTest.java        # 通常 JUnit + Mockito
-        └── mapper/TodoMapperTest.java          # @MybatisTest
+src/test/java/io/github/futomaru/todoapp/
+├── controller/TodoControllerTest.java   # RestTestClient + Mockito (standalone)
+├── service/TodoServiceTest.java         # JUnit 5 + Mockito
+└── mapper/TodoMapperTest.java           # @MybatisTest
 ```
+
+各テストの構成意図は [§11](#11-テスト戦略) と [testing-guide.md](testing-guide.md) を参照。
 
 ---
 
@@ -174,8 +149,9 @@ todoapp/
 > 「ビジネスロジックは Service 層に集める」という Spring の典型設計と整合する。
 >
 > Service は `java.time.Clock` をコンストラクタで DI し、`LocalDateTime.now(clock)` を使う。
-> 本番では `@Bean Clock systemClock() { return Clock.systemDefaultZone(); }` を登録し、
-> テストでは `Clock.fixed(...)` を注入することで時刻を固定して検証できる。
+> 本番では `TodoappApplication` に `@Bean Clock systemClock() { return Clock.systemDefaultZone(); }` を登録し、
+> テストでは `Clock.fixed(...)` を注入することで時刻を固定して検証できる
+> （Bean 定義のコードは [TodoappApplication.java](../src/main/java/io/github/futomaru/todoapp/TodoappApplication.java) 参照）。
 
 ### 5.2 `Todo` エンティティ設計
 
@@ -186,9 +162,11 @@ getter/setter の手書きは冗長になるため、**Lombok の `@Getter` / `@
 ```java
 import lombok.Getter;
 import lombok.Setter;
+import lombok.NoArgsConstructor;
 
 @Getter
 @Setter
+@NoArgsConstructor
 public class Todo {
     private Long id;
     private String title;
@@ -199,17 +177,18 @@ public class Todo {
 }
 ```
 
-> **なぜ Entity に Lombok を使うのか**: MyBatis のような可変 POJO 前提の OR マッパーでは
-> 各フィールドに getter/setter が必須となるが、これを手書きするのはノイズが大きい。
-> `@Getter` `@Setter` を使えば、フィールド宣言だけ書けばコンパイル時にアクセサが生成される。
+> **なぜ Entity に Lombok（`@Getter` `@Setter` `@NoArgsConstructor`）を使うのか**: MyBatis は
+> リフレクションで Entity をインスタンス化し（→ 引数なしコンストラクタが必要）、setter 経由で
+> 各カラム値を注入する。`@Getter` `@Setter` `@NoArgsConstructor` をフィールド宣言だけで賄うと、
+> 設計意図（「これは MyBatis が触る可変 POJO」）が一目で読める。
 >
 > **なぜ DTO（`record`）には Lombok を使わないのか**: `record` は宣言だけで
-> 不変フィールド・アクセサ（`title()` 形式）・`equals` / `hashCode` / `toString` を自動生成するため
+> 不変フィールド・アクセサ（`title()` 形式）・`equals` / `hashCode` / `toString` を自動生成する。
 > Lombok を重ねる必要がない。むしろ「DTO は不変・Entity は可変」という設計意図を
 > `record` vs `@Getter @Setter` の対比で表現できる。
 >
-> **`@Data` を使わない理由**: `@Data` は `@EqualsAndHashCode` も含むため、
-> 可変 Entity の `equals` が ID 確定前後で変化するなどの落とし穴がある。
+> **`@Data` を使わない理由**: `@Data` は `@EqualsAndHashCode` も含む。
+> 可変 Entity の `equals` が ID 確定前後で変化するなどの落とし穴があるため、
 > 学習目的では明示的に `@Getter` `@Setter` のみに留める方が安全。
 
 ### 5.3 DTO 設計（Java `record`）
@@ -339,6 +318,7 @@ Base URL: `http://localhost:8080/api/v1/todos`
 ### 6.2 エラーレスポンス形式（`ProblemDetail` / RFC 7807）
 
 エラーは Spring Framework 標準の `ProblemDetail` で返す。`Content-Type: application/problem+json`。
+すべての ProblemDetail に `instance` としてリクエスト URI をセットする。
 
 ```json
 {
@@ -350,8 +330,7 @@ Base URL: `http://localhost:8080/api/v1/todos`
 }
 ```
 
-バリデーションエラー（400）の場合は `errors` のような独自フィールドを `setProperty` で追加する。
-`@RestControllerAdvice` で `MethodArgumentNotValidException` を捕捉し、各フィールドエラーを整形する。
+バリデーション失敗（400）には独自フィールド `errors` を `setProperty` で追加する。
 
 ```json
 {
@@ -366,6 +345,22 @@ Base URL: `http://localhost:8080/api/v1/todos`
   ]
 }
 ```
+
+#### `GlobalExceptionHandler` が捕捉する例外
+
+入力経路ごとに発生する例外が異なるため、`@RestControllerAdvice` で **3 種類** を扱う：
+
+| 例外 | 発生する入力経路 | レスポンス |
+|------|-------------|-----------|
+| `TodoNotFoundException` | Service が ID 未存在で投げる業務例外 | 404 + `detail = "Todo not found: {id}"` |
+| `MethodArgumentNotValidException` | `@RequestBody @Valid` の DTO（POST/PATCH ボディ）のバリデーション失敗 | 400 + `errors[]` |
+| `HandlerMethodValidationException` | `@PathVariable @Min(1)` / `@RequestParam @AssertTrue` のような **メソッド引数直接**のバリデーション失敗（Spring Framework 6.1+ で導入） | 400 + `errors[]` |
+| `MissingServletRequestParameterException` | 必須 `@RequestParam` の欠落（例: `DELETE /api/v1/todos` に `?completed=` が無い） | 400 |
+
+> **学習ポイント**: `@RequestBody @Valid` 経由のバリデーションと、メソッド引数直接（`@PathVariable @Min` 等）の
+> バリデーションでは Spring が投げる例外型が **異なる**。
+> どちらも 400 + ProblemDetail に変換するが、内部 API（`BindingResult` vs `ParameterValidationResult`）が違うため
+> ハンドラを分けて書く必要がある。同じ形式の JSON にまとめあげるのが `GlobalExceptionHandler` の仕事。
 
 ### 6.3 リクエスト / レスポンス詳細
 
@@ -387,8 +382,14 @@ Base URL: `http://localhost:8080/api/v1/todos`
 #### GET `/api/v1/todos/{id}`
 ```
 レスポンス 200: { "id": 1, ... }
+レスポンス 400: ProblemDetail (id が 0 以下のとき)
 レスポンス 404: ProblemDetail (status=404, detail="Todo not found: 1")
 ```
+
+> **`{id}` に `@Min(1)` を付ける理由**: ID は DB の `AUTO_INCREMENT` で 1 以上が採番されるため、
+> 0 や負の値は構造的に存在し得ない。Controller の入口で `@PathVariable @Min(1) Long id` として
+> 弾けば、Service / Mapper を呼ぶ前に 400 で短絡できる。
+> Service に「ID は正の整数」という前提を持ち込まずに済むのが利点。
 
 #### POST `/api/v1/todos`
 ```
@@ -435,27 +436,30 @@ Base URL: `http://localhost:8080/api/v1/todos`
 レスポンス 400: completed が未指定 / true 以外の場合の ProblemDetail
 ```
 
-> **設計判断 1 — パス形式の選択**: 「完了済みを一括削除」を表現する方法は複数あり得る：
+##### 設計判断の整理
+
+| 論点 | 採用 | 理由 |
+|------|------|------|
+| パス形式 | `DELETE /api/v1/todos?completed=true` | GET の `?completed=...` と対称。「同じフィルターで取得 → 削除」のメンタルモデルが一貫 |
+| マッチ 0 件のステータス | 204 | コレクション削除は「条件にマッチしたものを消す」操作。0 件は正常な空集合操作（冪等性も自然に成立） |
+| レスポンスボディ | なし | フロントは削除後に一覧を再取得するため不要。「ボディなし = 204」の慣習を維持 |
+| `?completed=false` | **受け付けない**（400） | 「未完了を一括削除」は誤操作リスク極大。UI からも公開しない |
+
+##### 棄却した代替案
+
+| 案 | 棄却理由 |
+|---|---------|
+| `DELETE /api/v1/todos/completed` | `completed` がリソース名か状態名か曖昧。フィルター増で破綻 |
+| `POST /api/v1/todos/clear-completed` | REST セマンティクスから外れる（削除を POST で表現） |
+
+> **学習ポイント — 単一 DELETE と コレクション DELETE のエラー意味論**:
+> 単一 `DELETE /{id}` は 404、コレクション `DELETE ?completed=true` は 0 件でも 204。
+> 「リソース指定の単一削除」と「条件指定の集合削除」では存在チェックの意味が違う、というのが要点。
 >
-> | 案 | 例 | 評価 |
-> |---|---|---|
-> | A. クエリフィルター付き DELETE | `DELETE /api/v1/todos?completed=true` | **採用**。GET の `?completed=...` と対称で「同じフィルターで取得 → 削除」というメンタルモデルが一貫する |
-> | B. サブリソース | `DELETE /api/v1/todos/completed` | 意図は明確だが、`completed` がリソース名なのか状態名なのか曖昧。フィルターが増えると破綻 |
-> | C. アクション風エンドポイント | `POST /api/v1/todos/clear-completed` | REST セマンティクスから外れる（削除を POST で表現）。学習教材としては避けたい |
->
-> **設計判断 2 — マッチ 0 件でも 204 を返す**: 単一 DELETE が 404 を返すのと対照的に、
-> コレクション削除では「条件にマッチしたものをすべて消す」という操作の性質上、
-> マッチ 0 件は **エラーではなく正常な空集合操作**。冪等性（2 回呼んでも同じ状態に収束）も自然に満たされる。
-> この **「単一リソース DELETE」と「コレクション DELETE」のエラー意味論の違い** は重要な学習論点。
->
-> **設計判断 3 — レスポンスボディに削除件数を含めない**: 「削除件数 N を返す」設計もあり得るが、
-> 本 MVP のフロントエンドは削除後に一覧を再取得するため不要。
-> 「ボディなし = 204」の慣習を崩さない方を優先する。必要になった時点で 200 + ボディに切り替える。
->
-> **設計判断 4 — `?completed=false` は受け付けない**: 形式的には「未完了をすべて削除」と
-> 解釈可能だが、これは誤操作リスクが極めて高く、UI からも公開しない機能。
-> 「`completed` パラメータは必須かつ `true` のみ許可」と仕様で明示し、それ以外は 400 で弾く。
-> （Mapper メソッドを `deleteCompleted()` と固定名にしているのも同じ理由 — §5.5 参照）
+> **`@AssertTrue` で `?completed=true` 以外を 400 にする**:
+> Controller では `@RequestParam @AssertTrue boolean completed` と書くだけで、
+> false や型不一致を Spring が `HandlerMethodValidationException` として投げる。
+> Service に「`completed == true` チェック」を持ち込まずに済むのが利点（§6.2 参照）。
 
 ---
 
@@ -491,11 +495,9 @@ spring.h2.console.enabled=true
 spring.h2.console.path=/h2-console
 ```
 
-> **プロファイル分離の指針（発展課題）**: 上記の `spring.h2.console.*` のように
-> 開発時のみ有効化したい設定は、`application-dev.properties` / `application-prod.properties`
-> に分離し、起動時に `--spring.profiles.active=dev` で切り替えるのが Spring Boot の典型構成。
-> 本リポジトリの最初の実装では単一の `application.properties` で進め、
-> プロファイル分離は学習の次ステップとして取り組むとよい。
+> **プロファイル分離（発展課題）**: 開発時のみ有効化したい設定（`spring.h2.console.*` 等）は、
+> `application-dev.properties` / `application-prod.properties` に分離し
+> `--spring.profiles.active=dev` で切り替えるのが Spring Boot の典型構成。本 MVP では単一ファイルで進める。
 
 ---
 
@@ -510,6 +512,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.1.0'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.diffplug.spotless' version '7.0.2'   // フォーマッタ。googleJavaFormat を使用
 }
 
 java {
@@ -521,25 +524,38 @@ java {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'           // Spring MVC
     implementation 'org.springframework.boot:spring-boot-starter-validation'    // バリデーション
-    // ↓ Spring Boot 4 対応版
-    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.0.0'
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.0.0'  // Spring Boot 4 対応版
+    // Spring Framework 7 / Boot 4 が公式採用した JSpecify の null 注釈
+    // jakarta.annotation.@Nullable ではなく org.jspecify.annotations.@Nullable を使う
+    implementation 'org.jspecify:jspecify:1.0.0'
     runtimeOnly    'com.h2database:h2'                                          // H2 組み込みDB
 
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'      // RestTestClient / AssertJ / JUnit5 / Mockito 同梱
     testImplementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.0.0'
     testRuntimeOnly    'org.junit.platform:junit-platform-launcher'
 
-    // Lombok（Entity の getter/setter 生成に利用）
+    // Lombok（Entity の getter/setter/コンストラクタ生成に利用）
     compileOnly         'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 }
 ```
+
+> **JSpecify の `@Nullable`**: Spring Framework 7 / Boot 4 から、null 許容を示す標準が **JSpecify** に統一された。
+> Service の `findAll(@Nullable Boolean completed)` のように、nullable な引数・戻り値に明示する。
+> IDE / 静的解析（NullAway 等）が型情報として読める利点がある。
 
 `gradle/wrapper/gradle-wrapper.properties`:
 
 ```properties
 distributionUrl=https\://services.gradle.org/distributions/gradle-9.5.1-bin.zip
 ```
+
+> **Spotless（フォーマッタ）を入れる理由**: コードスタイル（インデント・import 並び・末尾空白）の議論を
+> ツールに任せ、レビューの焦点を設計に集中させるため。
+> 本プロジェクトでは Google Java Format をベースに、未使用 import 除去・アノテーション整形・末尾改行を強制する
+> （詳細は `build.gradle` の `spotless { ... }` ブロック参照）。
+> 開発時は `./gradlew spotlessApply` で自動整形できる。
+
 
 ---
 
@@ -555,10 +571,10 @@ distributionUrl=https\://services.gradle.org/distributions/gradle-9.5.1-bin.zip
 | 6 | DTO 実装（3 つの `record`） | `dto/*.java` |
 | 7 | カスタム例外実装 | `exception/TodoNotFoundException.java` |
 | 8 | サービス実装（`@Transactional` 適用） | `service/TodoService.java` |
-| 9 | コントローラー実装 | `controller/TodoController.java` |
-| 10 | 例外ハンドラー実装（`ProblemDetail` で返却、`MethodArgumentNotValidException` も捕捉） | `exception/GlobalExceptionHandler.java` |
+| 9 | コントローラー実装（`@Valid` 委譲、`@PathVariable @Min(1)`、`@RequestParam @AssertTrue`） | `controller/TodoController.java` |
+| 10 | 例外ハンドラー実装（`ProblemDetail` で返却。`TodoNotFoundException` / `MethodArgumentNotValidException` / `HandlerMethodValidationException` / `MissingServletRequestParameterException` を捕捉） | `exception/GlobalExceptionHandler.java` |
 | 11 | フロントエンド実装 | `static/index.html`, `static/app.js`, `static/style.css` |
-| 12 | テスト実装（Mapper / Service / Controller の 3 層） | `src/test/java/.../**Test.java` |
+| 12 | テスト実装（Mapper: `@MybatisTest` / Service: Mockito / Controller: `RestTestClient`） | `src/test/java/.../**Test.java` |
 | 13 | （発展）プロファイル分離 | `application-dev.properties` / `application-prod.properties` |
 
 ---
@@ -601,22 +617,24 @@ renderTodos(list)    ← DOM 更新
 
 ## 11. テスト戦略
 
-Spring Boot のテスト用スライス（部分起動）を活用し、3 層を独立してテストする。
+層ごとに最小のスライスを使う。**サンプルコードは [testing-guide.md](testing-guide.md) に集約**しているため、
+ここでは「なぜその構成にしたか」のみ記す。
 
-| 層 | テスト種別 | 主な使用クラス・アノテーション | 観点 |
-|----|-----------|----------------------------|------|
-| Mapper | DB 統合テスト | `@MybatisTest` | SQL が H2 上で正しく動くか |
-| Service | 単体テスト | JUnit 5 + Mockito | ビジネスロジック、例外スロー、`Clock` 注入による時刻固定 |
-| Controller | Web 層テスト | `@WebMvcTest` + `MockMvc` | HTTP マッピング、バリデーション、ステータスコード、`ProblemDetail` の形式 |
-| 全体 | 結合テスト | `@SpringBootTest` | エンドツーエンドの動作確認 |
+| 層 | テスト構成 | 設計判断 |
+|----|-----------|---------|
+| Mapper | `@MybatisTest` + 自動構成 H2 | DB 連動部分は本番に近い形（H2 への実 SQL 発行）で検証する。トランザクション境界はテストごとに自動ロールバック |
+| Service | JUnit 5 + Mockito + `Clock.fixed(...)` | ビジネスロジックを純粋に検証する。Mapper を `@Mock` で差し替え、時刻を固定して `created_at`/`updated_at` の挙動を観察する |
+| Controller | `RestTestClient.bindToController(...)` + `setControllerAdvice(...)` + Mockito | Web 層を **standalone** で起動（DispatcherServlet なし）。Service を `@Mock`、`GlobalExceptionHandler` を組み込み、Controller + ハンドラの協調をテストする |
+| 全体 | `@SpringBootTest` | エンドツーエンドのハッピーパスを少数だけ |
 
-> **学習ポイント**: Spring Boot のテスト用スライスは **必要な Bean だけを起動** することで
-> テストを高速化する仕組み。`@SpringBootTest` だけに頼らず、層ごとに適切なスライスを選ぶ感覚を身に付ける。
+> **`@WebMvcTest + MockMvc` ではなく `RestTestClient` を採用する理由**:
+> Spring Framework 7 で導入された `RestTestClient` は WebTestClient 系の流れる API を持ち、
+> standalone モードで Controller を組み立てるため Spring コンテキストの起動が要らない。
+> `@WebMvcTest` よりさらに小さい単位で Controller を検証でき、テスト起動が速い。
 >
 > **`@MybatisTest` の DB に関する注意**: `@MybatisTest` はデフォルトで本番の DataSource を
-> in-memory の embedded DB（H2 など）に **置換** する。本番の file-based H2 と
-> ストレージモードが異なる点を把握しておくこと。本番と同じ file-based DB でテストしたい場合は
-> `@AutoConfigureTestDatabase(replace = Replace.NONE)` を併用する。
+> in-memory の embedded DB に **置換** する。本番の file-based H2 とストレージモードが異なる点に留意。
+> 本番と同じ file-based DB でテストしたい場合は `@AutoConfigureTestDatabase(replace = Replace.NONE)` を併用する。
 
 ---
 
