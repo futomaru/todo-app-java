@@ -148,16 +148,34 @@ paths:
         '400':
           description: |
             `completed` が未指定、または `true` 以外の値が指定された場合。
+            実装上は内部例外が分かれる（詳細は design.md §6.2 の対応表参照）:
+            - 未指定 → `MissingServletRequestParameterException` → `detail: "Required parameter 'completed' is not present"`
+            - `false` など `true` 以外 → `HandlerMethodValidationException`（`@AssertTrue` 違反）
+              → `detail: "Validation failed"` + `errors[]`
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetail'
-              example:
-                type: about:blank
-                title: Bad Request
-                status: 400
-                detail: 'Required parameter ''completed'' is not present or invalid'
-                instance: /api/v1/todos
+              examples:
+                missing:
+                  summary: completed クエリ未指定
+                  value:
+                    type: about:blank
+                    title: Bad Request
+                    status: 400
+                    detail: "Required parameter 'completed' is not present"
+                    instance: /api/v1/todos
+                invalid:
+                  summary: completed=false など true 以外
+                  value:
+                    type: about:blank
+                    title: Bad Request
+                    status: 400
+                    detail: Validation failed
+                    instance: /api/v1/todos
+                    errors:
+                      - field: completed
+                        message: must be true
 
   /api/v1/todos/{id}:
     parameters:
@@ -181,6 +199,8 @@ paths:
                 completed: false
                 createdAt: '2026-06-02T10:00:00'
                 updatedAt: '2026-06-02T10:00:00'
+        '400':
+          $ref: '#/components/responses/InvalidPathId'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -229,7 +249,13 @@ paths:
                 createdAt: '2026-06-02T10:00:00'
                 updatedAt: '2026-06-02T11:30:00'
         '400':
-          $ref: '#/components/responses/ValidationFailed'
+          description: |
+            リクエストボディのバリデーション失敗（`@Size` 違反など）、
+            または `id` が 1 未満（`@PathVariable @Min(1)` 違反）。
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ValidationProblemDetail'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -244,6 +270,8 @@ paths:
       responses:
         '204':
           description: 削除成功（ボディなし）
+        '400':
+          $ref: '#/components/responses/InvalidPathId'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -444,6 +472,24 @@ components:
             status: 404
             detail: 'Todo not found: 1'
             instance: /api/v1/todos/1
+
+    InvalidPathId:
+      description: |
+        パス変数 `{id}` が 1 未満（`@PathVariable @Min(1)` 違反）。
+        Service / Mapper を呼ぶ前に Controller の入口で短絡する。
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblemDetail'
+          example:
+            type: about:blank
+            title: Bad Request
+            status: 400
+            detail: Validation failed
+            instance: /api/v1/todos/0
+            errors:
+              - field: id
+                message: must be greater than or equal to 1
 
     ValidationFailed:
       description: |

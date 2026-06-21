@@ -8,13 +8,12 @@ import org.springframework.context.annotation.Bean;
 @SpringBootApplication
 public class TodoappApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(TodoappApplication.class, args);
-	}
+  public static void main(String[] args) {
+    SpringApplication.run(TodoappApplication.class, args);
+  }
 
-	@Bean
-	public Clock systemClock() {
-		return Clock.systemDefaultZone();
-	}
-
+  @Bean
+  public Clock systemClock() {
+    return Clock.systemDefaultZone();
+  }
 }
