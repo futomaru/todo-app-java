@@ -14,6 +14,18 @@
 - Controller は `@Valid` を付けるだけ
 - PATCH の `title` は `@Size(min = 1, max = 255)`（null は許可、空文字のみ弾く）
 
+**Lombok 利用方針**
+- Entity（mutable POJO）: `@Getter` `@Setter` を付け、getter/setter の手書きを省く
+  - MyBatis が setter 経由でフィールドに値を注入するため可変クラスである必要があるが、
+    アクセサを手書きするのはノイズが大きい。Lombok で機械的に生成して本質に集中する。
+- DTO（`record`）: **Lombok は使わない**
+  - `record` 自体がアクセサ・`equals` / `hashCode` / `toString` を自動生成し、不変性も保証する。
+    Lombok を重ねる必要がない。
+- `@Data` は使わない
+  - `@EqualsAndHashCode` を含むため可変 Entity の同値性判断が ID 確定前後で変わる落とし穴がある。
+    学習目的では `@Getter` `@Setter` のみに留める方が安全。
+- `@SneakyThrows` のような「魔法」アノテーションは避ける（例外は明示的に扱う）
+
 ## 命名規則
 
 | 対象 | 規則 | 例 |

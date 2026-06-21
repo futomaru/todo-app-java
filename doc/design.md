@@ -5,9 +5,9 @@
 Spring MVC を用いた REST API 形式の TODO 管理バックエンドアプリケーション。  
 組み込みデータベース（H2）でデータを永続化し、基本的な CRUD 操作を提供する。
 
-本アプリは **Spring Boot 4 / Spring Framework 7 / JDK 25** を学習することを主目的とし、
-これらのバージョンで利用可能な新機能（`ProblemDetail`、Virtual Threads、`record` DTO、Text Blocks 等）
-を積極的に採用する。
+本アプリは **Spring Boot 4.1 / Spring Framework 7.1 / JDK 25** を学習することを主目的とし、
+これらのバージョンで利用可能な機能（`ProblemDetail`、Virtual Threads、`record` DTO、Text Blocks、
+pattern matching for `instanceof`／`switch` 等）を積極的に採用する。
 
 ### 1.1 スコープ: MVP (Minimum Viable Product)
 
@@ -43,21 +43,22 @@ Spring MVC を用いた REST API 形式の TODO 管理バックエンドアプ�
 | 項目 | 採用技術 | 理由 |
 |------|----------|------|
 | 言語 | Java 25 | プロジェクト指定（`record`、Text Blocks、pattern matching を活用） |
-| フレームワーク | Spring Boot 4.0.x + **Spring MVC** | DispatcherServlet ベースの標準的 Web レイヤー |
-| コアフレームワーク | Spring Framework **7.0** | Spring Boot 4.0 に同梱；Jakarta EE 11 ベース |
+| フレームワーク | Spring Boot 4.1.x + **Spring MVC** | DispatcherServlet ベースの標準的 Web レイヤー |
+| コアフレームワーク | Spring Framework **7.1** | Spring Boot 4.1 に同梱；Jakarta EE 11 ベース |
 | ビルドツール | Gradle **9** | プロジェクト指定 |
 | データベース | H2 (file-based) | 組み込みDB、再起動後もデータ保持 |
-| ORM | **MyBatis** (mybatis-spring-boot-starter) | SQL を明示的に記述、シンプルな CRUD に適している |
+| ORM | **MyBatis** (mybatis-spring-boot-starter 4.0.x) | SQL を明示的に記述、シンプルな CRUD に適している |
 | バリデーション | Jakarta Bean Validation | `@NotBlank` / `@Size` 等のアノテーションで入力検証 |
-| エラーレスポンス | **`ProblemDetail`** (RFC 7807) | Spring Framework 6+ の標準。`@RestControllerAdvice` で集約 |
-| 並行処理 | **Virtual Threads** | `spring.threads.virtual.enabled=true` の 1 行で有効化 |
+| エラーレスポンス | **`ProblemDetail`** (RFC 7807) | Spring Framework 6 で導入、7.1 でも標準。`@RestControllerAdvice` で集約 |
+| 並行処理 | **Virtual Threads** | JDK 21 で GA。`spring.threads.virtual.enabled=true` の 1 行で有効化 |
+| ボイラープレート削減 | **Lombok** | Entity の `getter`/`setter` を `@Getter`/`@Setter` で生成（DTO record には不要） |
 | フロントエンド | HTML / CSS / Vanilla JS | ビルドツール不要・Spring Boot の静的ファイル配信で提供 |
 
 ### 2.1 主な学習ポイント
 
-- **JDK 25**: `record` を DTO に採用し、不変オブジェクト（DTO）と可変 POJO（Entity）の使い分けを学ぶ。SQL は **Text Blocks** で記述。
-- **Spring Framework 7**: `ProblemDetail` ベースのエラーハンドリング、Virtual Threads サポート、Jakarta EE 11（`jakarta.*` 名前空間）が前提。
-- **Spring Boot 4**: 自動構成、`@Transactional` 境界、テスト用スライス（`@WebMvcTest` / `@MybatisTest`）の使い分け。
+- **JDK 25**: `record` を DTO に採用し、不変オブジェクト（DTO）と可変 POJO（Entity）の使い分けを学ぶ。SQL は **Text Blocks**（Java 15 で正式機能化）で記述。`instanceof` / `switch` の pattern matching（Java 16 / 21 で正式機能化）も必要に応じて活用する。
+- **Spring Framework 7.1**: `ProblemDetail` ベースのエラーハンドリング、Virtual Threads サポート、Jakarta EE 11（`jakarta.*` 名前空間）が前提。
+- **Spring Boot 4.1**: 自動構成、`@Transactional` 境界、テスト用スライス（`@WebMvcTest` / `@MybatisTest`）の使い分け。テストでの mock 注入は `@MockitoBean`（Spring Boot 3.4 で導入された `@MockBean` の後継）を用いる。
 
 ---
 
@@ -180,8 +181,14 @@ todoapp/
 
 MyBatis は setter 経由でカラム値を注入するため、Java `record` は使えない。
 **ミュータブルな通常クラス** として定義する（DTO とは対照的）。
+getter/setter の手書きは冗長になるため、**Lombok の `@Getter` / `@Setter`** で生成する。
 
 ```java
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
 public class Todo {
     private Long id;
     private String title;
@@ -189,9 +196,21 @@ public class Todo {
     private boolean completed;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    // getter / setter
 }
 ```
+
+> **なぜ Entity に Lombok を使うのか**: MyBatis のような可変 POJO 前提の OR マッパーでは
+> 各フィールドに getter/setter が必須となるが、これを手書きするのはノイズが大きい。
+> `@Getter` `@Setter` を使えば、フィールド宣言だけ書けばコンパイル時にアクセサが生成される。
+>
+> **なぜ DTO（`record`）には Lombok を使わないのか**: `record` は宣言だけで
+> 不変フィールド・アクセサ（`title()` 形式）・`equals` / `hashCode` / `toString` を自動生成するため
+> Lombok を重ねる必要がない。むしろ「DTO は不変・Entity は可変」という設計意図を
+> `record` vs `@Getter @Setter` の対比で表現できる。
+>
+> **`@Data` を使わない理由**: `@Data` は `@EqualsAndHashCode` も含むため、
+> 可変 Entity の `equals` が ID 確定前後で変化するなどの落とし穴がある。
+> 学習目的では明示的に `@Getter` `@Setter` のみに留める方が安全。
 
 ### 5.3 DTO 設計（Java `record`）
 
@@ -482,14 +501,14 @@ spring.h2.console.path=/h2-console
 
 ## 8. 依存関係（build.gradle）
 
-> Spring Boot 4.0.x（Spring Framework 7.0 / Jakarta EE 11）、Gradle 9 を前提とする。
+> Spring Boot 4.1.x（Spring Framework 7.1 / Jakarta EE 11）、Gradle 9 を前提とする。
 > MyBatis Spring Boot Starter は **Spring Boot 4 対応版** を使用する必要がある。
 > 最新バージョンは https://github.com/mybatis/spring-boot-starter のリリースを確認すること。
 
 ```groovy
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.6'
+    id 'org.springframework.boot' version '4.1.0'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -501,14 +520,18 @@ java {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'           // Spring MVC
-    // ↓ Spring Boot 4 対応版（バージョンは要確認）
-    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.0.0'
     implementation 'org.springframework.boot:spring-boot-starter-validation'    // バリデーション
+    // ↓ Spring Boot 4 対応版
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:4.0.0'
     runtimeOnly    'com.h2database:h2'                                          // H2 組み込みDB
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter-test:4.0.0'
     testRuntimeOnly    'org.junit.platform:junit-platform-launcher'
+
+    // Lombok（Entity の getter/setter 生成に利用）
+    compileOnly         'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
 }
 ```
 

@@ -61,12 +61,13 @@ io.github.futomaru.todoapp/
 | 項目 | 技術 |
 | --- | --- |
 | 言語 | Java 25 |
-| フレームワーク | Spring Boot 4.0.x / Spring Framework 7.0 |
+| フレームワーク | Spring Boot 4.1.x / Spring Framework 7.1.x |
 | Web 層 | Spring MVC |
 | DB アクセス | MyBatis |
 | DB | H2（file-based） |
 | バリデーション | Jakarta Bean Validation |
-| 並行処理 | Virtual Threads |
+| 並行処理 | Virtual Threads（JDK 21 で GA、本プロジェクトは JDK 25 で利用） |
+| ボイラープレート削減 | Lombok（Entity のみ `@Getter`/`@Setter`） |
 | フロントエンド | HTML / CSS / Vanilla JS |
 | テスト | JUnit 5 + Mockito / `@WebMvcTest` / `@MybatisTest` |
 | ビルド | Gradle 9 |
