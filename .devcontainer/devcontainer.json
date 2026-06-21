@@ -32,6 +32,9 @@
       ],
       "settings": {
         "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
+        },
         "java.server.launchMode": "Standard",
         "java.format.settings.profile": "GoogleStyle",
         "java.configuration.runtimes": [
