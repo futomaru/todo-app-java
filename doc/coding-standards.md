@@ -40,26 +40,16 @@
 
 ## コメント規約
 
+**Javadoc の書式**
+- Java 23+ の Markdown Javadoc（`///` 行コメント / JEP 467）を使う
+- `/** ... */` の HTML Javadoc は使わない
+
 **Javadoc を付ける対象**
-- Controller / Service / Mapper / Exception クラス: クラスレベルに責務 1〜2 文
-- Mapper メソッド: 1 行説明 + `@param` / `@return`
-- Controller ハンドラ: HTTP メソッド + パス + `@param` / `@return` / `@throws`
-- DTO record コンポーネント: `@param` で意味を記述
+- Controller / Service / Mapper / Exception クラス: クラスレベルに責務
+- Mapper メソッド: 説明
+- Controller ハンドラ: 非自明な振る舞いがある場合のみ
+- DTO record コンポーネント: 意味が非自明な場合のみ
 
-**Why コメント**（`// why:` プレフィックス）
-
-設計判断や非自明な理由を記録する。コードを読めば分かる逐次翻訳は書かない。
-
-```java
-// why: テスト時に時刻を固定するため Clock 経由で取得
-private final Clock clock;
-
-// why: PATCH は null=未指定を許容するため @NotBlank でなく @Size(min=1)
-@Size(min = 1, max = 255) String title;
-
-// why: @Options により id がここで entity に書き戻される
-mapper.insert(entity);
-```
 
 **テストコード**
 
