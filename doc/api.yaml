@@ -6,6 +6,7 @@ info:
   description: |
     学習用 Todo アプリの REST API 仕様（MVP）。
 
+    - 実行基盤: Spring Boot 4.1.x / Spring Framework 7.1.x / JDK 25
     - 設計の意図・背景: [doc/design.md](./design.md)
     - スコープ: TodoMVC 相当のコア機能のみ（design.md §1.1）
     - エラー形式: RFC 7807 `application/problem+json`（design.md §6.2）
@@ -370,7 +371,8 @@ components:
       type: object
       description: |
         RFC 7807 `application/problem+json` 準拠のエラーレスポンス。
-        Spring Framework 6+ の `org.springframework.http.ProblemDetail` がシリアライズされる。
+        Spring Framework 6 で導入された `org.springframework.http.ProblemDetail`
+        （本プロジェクトでは Spring Framework 7.1 のものを使用）がシリアライズされる。
       required:
         - title
         - status
