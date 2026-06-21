@@ -6,7 +6,9 @@
   "workspaceFolder": "/workspace",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
   "remoteUser": "user",
-  "forwardPorts": [8080],
+  "forwardPorts": [
+    8080
+  ],
   "features": {
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
   },
@@ -25,11 +27,13 @@
         "ms-ceintl.vscode-language-pack-ja",
         "vscjava.vscode-java-pack",
         "vmware.vscode-boot-dev-pack",
-        "donjayamanne.githistory"
+        "donjayamanne.githistory",
+        "anthropic.claude-code"
       ],
       "settings": {
         "editor.formatOnSave": true,
         "java.server.launchMode": "Standard",
+        "java.format.settings.profile": "GoogleStyle",
         "java.configuration.runtimes": [
           {
             "name": "JavaSE-25",
