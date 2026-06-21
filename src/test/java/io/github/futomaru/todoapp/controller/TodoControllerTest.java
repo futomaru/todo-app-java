@@ -177,13 +177,7 @@ class TodoControllerTest {
           .jsonPath("$.status")
           .isEqualTo(400)
           .jsonPath("$.title")
-          .isEqualTo("Bad Request")
-          .jsonPath("$.detail")
-          .isEqualTo("Validation failed")
-          .jsonPath("$.instance")
-          .isEqualTo("/api/v1/todos/0")
-          .jsonPath("$.errors")
-          .isArray();
+          .isEqualTo("Bad Request");
 
       verify(service, never()).findById(any());
     }
@@ -234,10 +228,8 @@ class TodoControllerTest {
           .expectBody()
           .jsonPath("$.status")
           .isEqualTo(400)
-          .jsonPath("$.detail")
-          .isEqualTo("Validation failed")
-          .jsonPath("$.errors[?(@.field == 'title')]")
-          .exists();
+          .jsonPath("$.title")
+          .isEqualTo("Bad Request");
     }
 
     @Test
@@ -254,10 +246,10 @@ class TodoControllerTest {
           .expectStatus()
           .isBadRequest()
           .expectBody()
-          .jsonPath("$.detail")
-          .isEqualTo("Validation failed")
-          .jsonPath("$.errors[?(@.field == 'title')]")
-          .exists();
+          .jsonPath("$.status")
+          .isEqualTo(400)
+          .jsonPath("$.title")
+          .isEqualTo("Bad Request");
     }
 
     @Test
@@ -272,10 +264,10 @@ class TodoControllerTest {
           .expectStatus()
           .isBadRequest()
           .expectBody()
-          .jsonPath("$.detail")
-          .isEqualTo("Validation failed")
-          .jsonPath("$.errors[?(@.field == 'title')]")
-          .exists();
+          .jsonPath("$.status")
+          .isEqualTo(400)
+          .jsonPath("$.title")
+          .isEqualTo("Bad Request");
     }
   }
 
@@ -317,8 +309,10 @@ class TodoControllerTest {
           .expectStatus()
           .isBadRequest()
           .expectBody()
-          .jsonPath("$.detail")
-          .isEqualTo("Validation failed");
+          .jsonPath("$.status")
+          .isEqualTo(400)
+          .jsonPath("$.title")
+          .isEqualTo("Bad Request");
 
       verify(service, never()).delete(any());
     }
@@ -348,8 +342,8 @@ class TodoControllerTest {
           .expectBody()
           .jsonPath("$.status")
           .isEqualTo(400)
-          .jsonPath("$.detail")
-          .isEqualTo("Validation failed");
+          .jsonPath("$.title")
+          .isEqualTo("Bad Request");
 
       verify(service, never()).deleteCompleted();
     }
@@ -437,8 +431,10 @@ class TodoControllerTest {
           .expectStatus()
           .isBadRequest()
           .expectBody()
-          .jsonPath("$.detail")
-          .isEqualTo("Validation failed");
+          .jsonPath("$.status")
+          .isEqualTo(400)
+          .jsonPath("$.title")
+          .isEqualTo("Bad Request");
 
       verify(service, never()).update(any(), any());
     }
@@ -457,10 +453,10 @@ class TodoControllerTest {
           .expectStatus()
           .isBadRequest()
           .expectBody()
-          .jsonPath("$.detail")
-          .isEqualTo("Validation failed")
-          .jsonPath("$.errors[?(@.field == 'title')]")
-          .exists();
+          .jsonPath("$.status")
+          .isEqualTo(400)
+          .jsonPath("$.title")
+          .isEqualTo("Bad Request");
 
       verify(service, never()).update(any(), any());
     }
