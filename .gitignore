@@ -39,3 +39,13 @@ out/
 
 # H2 database file
 data/
+
+# Spring Boot logs
+logs/
+*.log
+
+# Local config overrides
+application-local.properties
+
+# macOS
+.DS_Store
