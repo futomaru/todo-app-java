@@ -6,16 +6,18 @@ import io.github.futomaru.todoapp.dto.TodoUpdateRequest;
 import io.github.futomaru.todoapp.entity.Todo;
 import io.github.futomaru.todoapp.exception.TodoNotFoundException;
 import io.github.futomaru.todoapp.mapper.TodoMapper;
-import jakarta.annotation.Nullable;
 
 import java.util.List;
 import java.time.Clock;
 import java.time.LocalDateTime;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/// Todo のビジネスロジックを提供するサービス層。
 @Service
+@Transactional(readOnly = true)
 public class TodoService {
     private final TodoMapper todoMapper;
     private final Clock clock;
@@ -25,7 +27,6 @@ public class TodoService {
         this.clock = clock;
     }
 
-    @Transactional(readOnly = true)
     public List<TodoResponse> findAll(@Nullable Boolean completed) {
         List<Todo> todos = (completed == null)
                 ? todoMapper.findAll()
@@ -33,7 +34,6 @@ public class TodoService {
         return todos.stream().map(TodoResponse::from).toList();
     }
 
-    @Transactional(readOnly = true)
     public TodoResponse findById(Long id) {
         Todo todo = todoMapper.findById(id)
                 .orElseThrow(() -> new TodoNotFoundException(id));
