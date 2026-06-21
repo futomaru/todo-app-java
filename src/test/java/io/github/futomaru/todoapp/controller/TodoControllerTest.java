@@ -4,6 +4,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -22,6 +24,9 @@ import io.github.futomaru.todoapp.exception.GlobalExceptionHandler;
 import io.github.futomaru.todoapp.exception.TodoNotFoundException;
 import io.github.futomaru.todoapp.service.TodoService;
 
+/// `TodoController` の Web 層テスト。
+/// `RestTestClient` で Controller を standalone に組み立て、`GlobalExceptionHandler` を組み込んだ上で、
+/// HTTP マッピング・Bean Validation・`ProblemDetail` 形式の応答を検証する。
 @ExtendWith(MockitoExtension.class)
 class TodoControllerTest {
     @Mock
@@ -38,6 +43,8 @@ class TodoControllerTest {
                 .build();
     }
 
+    /// `GET /api/v1/todos`: `completed` クエリパラメータの有無による Service への振り分けと、
+    /// レスポンス JSON 配列の構造を検証する。
     @Nested
     class ListTodos {
 
@@ -94,6 +101,8 @@ class TodoControllerTest {
         }
     }
 
+    /// `GET /api/v1/todos/{id}`: 正常系の 200、`TodoNotFoundException` 由来の 404、
+    /// `@PathVariable @Min(1)` バリデーション失敗による 400 の振り分けを検証する。
     @Nested
     class GetTodoById {
 
@@ -118,10 +127,30 @@ class TodoControllerTest {
                     .exchange()
                     .expectStatus().isNotFound()
                     .expectBody()
-                    .jsonPath("$.detail").isEqualTo("Todo not found: 999");
+                    .jsonPath("$.status").isEqualTo(404)
+                    .jsonPath("$.title").isEqualTo("Not Found")
+                    .jsonPath("$.detail").isEqualTo("Todo not found: 999")
+                    .jsonPath("$.instance").isEqualTo("/api/v1/todos/999");
+        }
+
+        @Test
+        void idが0のとき400とProblemDetailを返す() {
+            client.get().uri("/api/v1/todos/0")
+                    .exchange()
+                    .expectStatus().isBadRequest()
+                    .expectBody()
+                    .jsonPath("$.status").isEqualTo(400)
+                    .jsonPath("$.title").isEqualTo("Bad Request")
+                    .jsonPath("$.detail").isEqualTo("Validation failed")
+                    .jsonPath("$.instance").isEqualTo("/api/v1/todos/0")
+                    .jsonPath("$.errors").isArray();
+
+            verify(service, never()).findById(any());
         }
     }
 
+    /// `POST /api/v1/todos`: 正常系の 201 + `Location` ヘッダー生成と、
+    /// `@RequestBody @Valid TodoCreateRequest` のバリデーション失敗（`@NotBlank` / `@Size`）による 400 を検証する。
     @Nested
     class CreateTodo {
 
@@ -136,42 +165,56 @@ class TodoControllerTest {
                             """)
                     .exchange()
                     .expectStatus().isCreated()
-                    .expectHeader().location("/api/v1/todos/1");
+                    .expectHeader().value("Location", location -> {
+                        org.assertj.core.api.Assertions.assertThat(location).endsWith("/api/v1/todos/1");
+                    });
         }
 
         @Test
-        void titleがnullのとき400を返す() {
+        void titleがnullのとき400とProblemDetailを返す() {
             client.post().uri("/api/v1/todos")
                     .contentType(MediaType.APPLICATION_JSON)
                     .body("""
                             {"title": null}
                             """)
                     .exchange()
-                    .expectStatus().isBadRequest();
+                    .expectStatus().isBadRequest()
+                    .expectBody()
+                    .jsonPath("$.status").isEqualTo(400)
+                    .jsonPath("$.detail").isEqualTo("Validation failed")
+                    .jsonPath("$.errors[?(@.field == 'title')]").exists();
         }
 
         @Test
-        void titleが空文字のとき400を返す() {
+        void titleが空文字のとき400とProblemDetailを返す() {
             client.post().uri("/api/v1/todos")
                     .contentType(MediaType.APPLICATION_JSON)
                     .body("""
                             {"title": ""}
                             """)
                     .exchange()
-                    .expectStatus().isBadRequest();
+                    .expectStatus().isBadRequest()
+                    .expectBody()
+                    .jsonPath("$.detail").isEqualTo("Validation failed")
+                    .jsonPath("$.errors[?(@.field == 'title')]").exists();
         }
 
         @Test
-        void titleが256文字以上のとき400を返す() {
+        void titleが256文字以上のとき400とProblemDetailを返す() {
             String longTitle = "a".repeat(256);
             client.post().uri("/api/v1/todos")
                     .contentType(MediaType.APPLICATION_JSON)
                     .body("{\"title\": \"" + longTitle + "\"}")
                     .exchange()
-                    .expectStatus().isBadRequest();
+                    .expectStatus().isBadRequest()
+                    .expectBody()
+                    .jsonPath("$.detail").isEqualTo("Validation failed")
+                    .jsonPath("$.errors[?(@.field == 'title')]").exists();
         }
     }
 
+    /// `DELETE /api/v1/todos/{id}`: 正常系の 204、`TodoNotFoundException` 由来の 404、
+    /// `@PathVariable @Min(1)` バリデーション失敗による 400 の振り分けを検証する。
     @Nested
     class DeleteTodo {
 
@@ -192,10 +235,24 @@ class TodoControllerTest {
                     .exchange()
                     .expectStatus().isNotFound()
                     .expectBody()
-                    .jsonPath("$.detail").isEqualTo("Todo not found: 999");
+                    .jsonPath("$.detail").isEqualTo("Todo not found: 999")
+                    .jsonPath("$.instance").isEqualTo("/api/v1/todos/999");
+        }
+
+        @Test
+        void idが0のとき400とProblemDetailを返す() {
+            client.delete().uri("/api/v1/todos/0")
+                    .exchange()
+                    .expectStatus().isBadRequest()
+                    .expectBody()
+                    .jsonPath("$.detail").isEqualTo("Validation failed");
+
+            verify(service, never()).delete(any());
         }
     }
 
+    /// `DELETE /api/v1/todos?completed=true`: 一括削除の 204、`@RequestParam @AssertTrue` による
+    /// `completed=true` 以外（false）の 400、必須パラメータ欠落（`MissingServletRequestParameterException`）の 400 を検証する。
     @Nested
     class DeleteCompleted {
 
@@ -209,13 +266,33 @@ class TodoControllerTest {
         }
 
         @Test
-        void completedがfalseのとき400を返す() {
+        void completedがfalseのとき400とProblemDetailを返す() {
             client.delete().uri("/api/v1/todos?completed=false")
                     .exchange()
-                    .expectStatus().isBadRequest();
+                    .expectStatus().isBadRequest()
+                    .expectBody()
+                    .jsonPath("$.status").isEqualTo(400)
+                    .jsonPath("$.detail").isEqualTo("Validation failed");
+
+            verify(service, never()).deleteCompleted();
+        }
+
+        @Test
+        void completedが未指定のとき400とProblemDetailを返す() {
+            client.delete().uri("/api/v1/todos")
+                    .exchange()
+                    .expectStatus().isBadRequest()
+                    .expectBody()
+                    .jsonPath("$.status").isEqualTo(400)
+                    .jsonPath("$.title").isEqualTo("Bad Request");
+
+            verify(service, never()).deleteCompleted();
         }
     }
 
+    /// `PATCH /api/v1/todos/{id}`: 部分更新の 200、`TodoNotFoundException` 由来の 404、
+    /// `@PathVariable @Min(1)` および `@RequestBody @Valid TodoUpdateRequest`（`@Size(min=1)`）の
+    /// バリデーション失敗による 400 を検証する。
     @Nested
     class PatchTodo {
 
@@ -250,6 +327,37 @@ class TodoControllerTest {
                     .expectStatus().isNotFound()
                     .expectBody()
                     .jsonPath("$.detail").isEqualTo("Todo not found: 999");
+        }
+
+        @Test
+        void idが0のとき400とProblemDetailを返す() {
+            client.patch().uri("/api/v1/todos/0")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("""
+                            {"title": "new"}
+                            """)
+                    .exchange()
+                    .expectStatus().isBadRequest()
+                    .expectBody()
+                    .jsonPath("$.detail").isEqualTo("Validation failed");
+
+            verify(service, never()).update(any(), any());
+        }
+
+        @Test
+        void titleが空文字のとき400とProblemDetailを返す() {
+            client.patch().uri("/api/v1/todos/1")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("""
+                            {"title": ""}
+                            """)
+                    .exchange()
+                    .expectStatus().isBadRequest()
+                    .expectBody()
+                    .jsonPath("$.detail").isEqualTo("Validation failed")
+                    .jsonPath("$.errors[?(@.field == 'title')]").exists();
+
+            verify(service, never()).update(any(), any());
         }
     }
 
