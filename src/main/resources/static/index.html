@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>todo. — things to strike off</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="style.css">
+
+  <!-- app.js を Alpine より先に読み込む（alpine:init リスナを登録してから Alpine を起動させるため） -->
+  <script defer src="app.js"></script>
+  <script defer
+          src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.10/dist/cdn.min.js"></script>
+</head>
+<body>
+  <main class="app" x-data="todoApp">
+
+    <header class="masthead">
+      <h1 class="wordmark">todo<span class="wordmark__dot">.</span></h1>
+      <p class="eyebrow">things to strike off</p>
+    </header>
+
+    <form class="composer" @submit.prevent="create">
+      <span class="composer__mark" aria-hidden="true">+</span>
+      <input class="composer__input"
+             x-model="newTitle"
+             placeholder="やること…"
+             autocomplete="off"
+             aria-label="新しいタスク"
+             required>
+      <button class="composer__add" type="submit">追加</button>
+    </form>
+
+    <nav class="filters" aria-label="表示の絞り込み">
+      <button class="filters__tab" @click="filter='all';       reload()"
+              :aria-current="filter==='all'">すべて</button>
+      <button class="filters__tab" @click="filter='active';    reload()"
+              :aria-current="filter==='active'">未完了</button>
+      <button class="filters__tab" @click="filter='completed'; reload()"
+              :aria-current="filter==='completed'">完了</button>
+    </nav>
+
+    <article class="alert" x-show="error" x-text="error" role="alert" x-cloak></article>
+
+    <p class="empty" x-show="todos.length === 0" x-cloak
+       x-text="filter==='active'    ? '未完了はありません 🎉'
+             : filter==='completed' ? '完了したものはまだありません。'
+             :                        'まだ何もありません。最初のひとつを追加しましょう。'"></p>
+
+    <ul class="tasks">
+      <template x-for="t in todos" :key="t.id">
+        <li class="task" :class="t.completed ? 'task--done' : ''">
+          <label class="task__main">
+            <input class="task__check" type="checkbox"
+                   :checked="t.completed" @change="toggle(t)"
+                   :aria-label="t.completed ? '未完了に戻す' : '完了にする'">
+            <span class="task__title" x-text="t.title"></span>
+          </label>
+          <button class="task__remove" @click="remove(t.id)"
+                  :aria-label="`「${t.title}」を削除`">削除</button>
+        </li>
+      </template>
+    </ul>
+
+    <footer class="ledger" x-show="todos.length > 0" x-cloak>
+      <span class="ledger__count">
+        未完了 <strong x-text="todos.filter(x => !x.completed).length"></strong>
+      </span>
+      <button class="ledger__clear" @click="clearCompleted">完了を消す →</button>
+    </footer>
+
+  </main>
+</body>
+</html>

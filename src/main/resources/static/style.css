@@ -1,0 +1,367 @@
+/* =========================================================================
+   todo. — "Citrus Ledger"
+   signature: タスクを「消し込む」瞬間（取り消し線が左→右に引かれる）
+   ========================================================================= */
+
+/* ---- デザイントークン ---- */
+:root {
+  --flame: #F4511E;   /* 操作・ブランド */
+  --flame-ink: #D8410F;
+  --flame-soft: color-mix(in srgb, var(--flame) 14%, transparent);
+  --pine: #0F8A6A;    /* 完了 */
+  --ink: #20242B;     /* 文字 */
+  --bg: #F1F0EC;      /* 背景（クールなペーパーグレー） */
+  --paper: #FFFFFF;   /* 面 */
+  --muted: #8A8A82;   /* メタ */
+  --line: #E2E0DA;    /* 罫 */
+  --line-strong: #C7C4BB;
+
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  --radius: 14px;
+  --radius-sm: 9px;
+}
+
+/* ---- リセット ---- */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+[x-cloak] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--flame);
+  color: #fff;
+}
+
+/* ---- レイアウト ---- */
+.app {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: clamp(2.25rem, 6vw, 3.75rem) 1.25rem 4rem;
+}
+
+/* ---- マストヘッド ---- */
+.masthead {
+  margin-bottom: 2rem;
+}
+
+.wordmark {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2.4rem, 8vw, 3.25rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.wordmark__dot {
+  color: var(--flame);
+}
+
+.eyebrow {
+  margin: 0.65rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---- 入力バー（プロンプト風） ---- */
+.composer {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.75rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.9rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.composer:focus-within {
+  border-color: var(--flame);
+  box-shadow: 0 0 0 3px var(--flame-soft);
+}
+
+.composer__mark {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.45rem;
+  line-height: 1;
+  color: var(--flame);
+  user-select: none;
+}
+
+.composer__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  color: var(--ink);
+  padding: 0.5rem 0;
+}
+
+.composer__input::placeholder { color: var(--muted); }
+.composer__input:focus { outline: none; }
+
+.composer__add {
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--flame);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.55rem 1.25rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.composer__add:hover { background: var(--flame-ink); }
+
+/* ---- フィルタタブ ---- */
+.filters {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.filters__tab {
+  margin-bottom: -1px;
+  padding: 0.55rem 0.85rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.filters__tab:hover { color: var(--ink); }
+
+.filters__tab[aria-current="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--flame);
+}
+
+/* ---- エラー ---- */
+.alert {
+  margin: 1.25rem 0 0;
+  padding: 0.75rem 1rem;
+  background: var(--flame-soft);
+  border-left: 3px solid var(--flame);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+/* ---- 空状態 ---- */
+.empty {
+  margin: 0;
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+/* ---- タスク一覧 ---- */
+.tasks {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+}
+
+.task {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 0.25rem 0.85rem 0.95rem;
+  border-bottom: 1px solid var(--line);
+}
+
+/* hover/focus 時に左端へ flame のティック */
+.task::before {
+  content: "";
+  position: absolute;
+  left: 0.1rem;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  border-radius: 2px;
+  background: var(--flame);
+  transform: translateY(-50%);
+  transition: height 0.15s ease;
+}
+
+.task:hover::before,
+.task:focus-within::before { height: 56%; }
+
+.task__main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+  cursor: pointer;
+}
+
+/* カスタムチェックボックス（実体の input は残す） */
+.task__check {
+  flex-shrink: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--paper);
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.task__check:hover { border-color: var(--pine); }
+
+.task__check:checked {
+  border-color: var(--pine);
+  background-color: var(--pine);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.4l3 3 6-7' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 0.85rem;
+}
+
+/* タイトル + 取り消し線（signature） */
+.task__title {
+  position: relative;
+  font-size: 1.05rem;
+  color: var(--ink);
+  word-break: break-word;
+  transition: color 0.2s ease;
+}
+
+.task__title::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 53%;
+  height: 2px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.22s ease;
+}
+
+.task--done .task__title { color: var(--muted); }
+.task--done .task__title::after { transform: scaleX(1); }
+
+/* 削除ボタン（hover/focus で出現） */
+.task__remove {
+  flex-shrink: 0;
+  opacity: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--muted);
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.task:hover .task__remove,
+.task:focus-within .task__remove { opacity: 1; }
+
+.task__remove:hover {
+  color: var(--flame);
+  border-color: var(--flame);
+}
+
+/* ---- フッター（台帳） ---- */
+.ledger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.ledger__count strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.ledger__clear {
+  border: none;
+  background: none;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.ledger__clear:hover { color: var(--flame); }
+
+/* ---- フォーカス可視化 ---- */
+:focus-visible {
+  outline: 2px solid var(--flame);
+  outline-offset: 2px;
+}
+
+.composer:focus-within .composer__input:focus-visible { outline: none; }
+
+/* ---- レスポンシブ ---- */
+@media (max-width: 480px) {
+  .composer { flex-wrap: wrap; }
+  .composer__input { flex-basis: 100%; order: 3; padding-top: 0.6rem; }
+  .composer__add { margin-left: auto; }
+  .task__remove { opacity: 1; }    /* タッチ端末では常時表示 */
+}
+
+/* タッチ主体の端末では削除ボタンを常時表示 */
+@media (hover: none) {
+  .task__remove { opacity: 1; }
+}
+
+/* ---- モーション抑制 ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
