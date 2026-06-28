@@ -53,7 +53,7 @@ pattern matching for `instanceof`／`switch` 等）を積極的に採用する�
 | 並行処理 | Virtual Threads | JDK 21 で GA。`spring.threads.virtual.enabled=true` で有効化できる |
 | null 表現 | JSpecify（`@Nullable`） | Spring Framework 7 が公式採用。`jakarta.annotation.@Nullable` からの移行先 |
 | ボイラープレート削減 | Lombok | Entity の getter/setter/コンストラクタ生成（DTO record には不要） |
-| フロントエンド | HTML / CSS / Vanilla JS | ビルドツール不要、Spring Boot の静的配信で完結 |
+| フロントエンド | HTML / CSS / Alpine.js (CDN) | ビルドツール不要・宣言的バインディングが書けて、学習用 SPA を最小構成で組める |
 
 ### 2.1 主な学習ポイント
 
@@ -122,9 +122,12 @@ GET /                       → ResourceHttpRequestHandler
 
 ```
 src/test/java/io/github/futomaru/todoapp/
+├── TodoappApplicationTests.java         # 結合テスト (@SpringBootTest RANDOM_PORT + 実 HTTP 往復)
 ├── controller/TodoControllerTest.java   # RestTestClient + Mockito (standalone)
 ├── service/TodoServiceTest.java         # JUnit 5 + Mockito
 └── mapper/TodoMapperTest.java           # @MybatisTest
+src/test/resources/
+└── application-test.properties          # in-memory H2 プロファイル（結合テスト用）
 ```
 
 各テストの構成意図は [§11](#11-テスト戦略) と [testing-guide.md](testing-guide.md) を参照。
@@ -330,37 +333,32 @@ Base URL: `http://localhost:8080/api/v1/todos`
 }
 ```
 
-バリデーション失敗（400）には独自フィールド `errors` を `setProperty` で追加する。
+バリデーション失敗（400）は Spring Boot が自動で生成する ProblemDetail をそのまま返す。
 
 ```json
 {
   "type": "about:blank",
   "title": "Bad Request",
   "status": 400,
-  "detail": "Validation failed",
-  "instance": "/api/v1/todos",
-  "errors": [
-    { "field": "title", "message": "must not be blank" },
-    { "field": "description", "message": "size must be between 0 and 1000" }
-  ]
+  "detail": "Invalid request content.",
+  "instance": "/api/v1/todos"
 }
 ```
 
-#### `GlobalExceptionHandler` が捕捉する例外
+#### `GlobalExceptionHandler` の構造
 
-入力経路ごとに発生する例外が異なるため、`@RestControllerAdvice` で **3 種類** を扱う：
+| 担当 | 対象 | 実装方法 |
+|------|------|---------|
+| 自前ハンドラ | `TodoNotFoundException`（業務例外） | `@ExceptionHandler` で 404 ProblemDetail を組み立てる |
+| 親クラスに委譲 | `MethodArgumentNotValidException` / `HandlerMethodValidationException` / `MissingServletRequestParameterException` 等の Spring 標準例外 | `ResponseEntityExceptionHandler` を継承し、Spring 6+ デフォルトの ProblemDetail 応答に任せる |
 
-| 例外 | 発生する入力経路 | レスポンス |
-|------|-------------|-----------|
-| `TodoNotFoundException` | Service が ID 未存在で投げる業務例外 | 404 + `detail = "Todo not found: {id}"` |
-| `MethodArgumentNotValidException` | `@RequestBody @Valid` の DTO（POST/PATCH ボディ）のバリデーション失敗 | 400 + `errors[]` |
-| `HandlerMethodValidationException` | `@PathVariable @Min(1)` / `@RequestParam @AssertTrue` のような **メソッド引数直接**のバリデーション失敗（Spring Framework 6.1+ で導入） | 400 + `errors[]` |
-| `MissingServletRequestParameterException` | 必須 `@RequestParam` の欠落（例: `DELETE /api/v1/todos` に `?completed=` が無い） | 400 |
-
-> **学習ポイント**: `@RequestBody @Valid` 経由のバリデーションと、メソッド引数直接（`@PathVariable @Min` 等）の
-> バリデーションでは Spring が投げる例外型が **異なる**。
-> どちらも 400 + ProblemDetail に変換するが、内部 API（`BindingResult` vs `ParameterValidationResult`）が違うため
-> ハンドラを分けて書く必要がある。同じ形式の JSON にまとめあげるのが `GlobalExceptionHandler` の仕事。
+> **学習ポイント — なぜ `ResponseEntityExceptionHandler` を継承するのか**:
+> Spring 6 から MVC の標準例外（`@Valid` 失敗、必須クエリ欠落、メッセージ変換エラー等）は
+> 親クラス側で **デフォルトで ProblemDetail に変換** されるようになった。継承するだけで
+> 多数の標準例外が RFC 7807 形式で返るため、業務例外（`TodoNotFoundException`）だけ自前で書けばよい。
+>
+> 「`@RequestBody @Valid` と `@PathVariable @Min` で投げられる例外型が違う」という Spring の仕様は
+> 学習として重要だが、それを **アプリ側で吸収する必要は無くなった** のがこの設計の要点。
 
 ### 6.3 リクエスト / レスポンス詳細
 
@@ -572,7 +570,7 @@ distributionUrl=https\://services.gradle.org/distributions/gradle-9.5.1-bin.zip
 | 7 | カスタム例外実装 | `exception/TodoNotFoundException.java` |
 | 8 | サービス実装（`@Transactional` 適用） | `service/TodoService.java` |
 | 9 | コントローラー実装（`@Valid` 委譲、`@PathVariable @Min(1)`、`@RequestParam @AssertTrue`） | `controller/TodoController.java` |
-| 10 | 例外ハンドラー実装（`ProblemDetail` で返却。`TodoNotFoundException` / `MethodArgumentNotValidException` / `HandlerMethodValidationException` / `MissingServletRequestParameterException` を捕捉） | `exception/GlobalExceptionHandler.java` |
+| 10 | 例外ハンドラー実装（`ResponseEntityExceptionHandler` を継承。`TodoNotFoundException` のみ自前で 404 ProblemDetail に変換し、Spring 標準例外は親クラスのデフォルト処理に委譲） | `exception/GlobalExceptionHandler.java` |
 | 11 | フロントエンド実装 | `static/index.html`, `static/app.js`, `static/style.css` |
 | 12 | テスト実装（Mapper: `@MybatisTest` / Service: Mockito / Controller: `RestTestClient`） | `src/test/java/.../**Test.java` |
 | 13 | （発展）プロファイル分離 | `application-dev.properties` / `application-prod.properties` |
@@ -585,33 +583,58 @@ distributionUrl=https\://services.gradle.org/distributions/gradle-9.5.1-bin.zip
 
 | ファイル | 役割 |
 |---------|------|
-| `static/index.html` | 1ページ構成のUI（TODO一覧・追加フォーム） |
-| `static/app.js` | `fetch()` で REST API を呼び出す純粋な JavaScript |
+| `static/index.html` | UI 構造 + Alpine.js のディレクティブ（`x-data` / `x-model` / `x-for` 等）でデータバインディング |
+| `static/app.js` | `Alpine.data('todoApp', () => ({...}))` で state とメソッドを登録 |
 | `static/style.css` | 最小限のスタイル定義 |
+
+Alpine.js 本体は `<script src="...alpinejs/cdn.min.js">` で CDN から読み込む。
+ビルドツール（npm / webpack 等）は **一切使わず**、Spring Boot の静的配信だけで完結する。
+
+> **Alpine.js を採用した理由**: Vanilla JS で `document.getElementById` や手動 DOM 更新を書くと、
+> 状態とビューの同期コードがボイラープレートとして増えていく。Alpine.js は `x-model` / `x-for` /
+> `x-show` などの宣言的バインディングで「状態 → ビュー」を自動同期できるため、学習用 SPA の
+> コード量を最小化できる。フレームワーク学習コストもタグ属性数個分で済む。
 
 ### 10.2 UI 機能
 
 | 機能 | 操作 |
 |------|------|
-| TODO 一覧表示 | ページ読み込み時に全件取得して描画 |
-| TODO 追加 | タイトル入力＋送信ボタンで POST |
-| 完了トグル | チェックボックスで PATCH（`completed` の反転） |
-| TODO 削除 | 削除ボタンで DELETE |
-| 完了フィルター | 「全件 / 未完了 / 完了」タブで GET `?completed=` |
-| 完了済み一括削除 | 「完了済みを削除」ボタンで DELETE `?completed=true` |
+| TODO 一覧表示 | ページ読み込み時 (`init()`) に `reload()` で全件取得 |
+| TODO 追加 | 入力欄 + 「追加」ボタンの submit で `create()` → POST |
+| 完了トグル | チェックボックスの change で `toggle(t)` → PATCH（`completed` 反転） |
+| TODO 削除 | 「削除」ボタンの click で `remove(id)` → DELETE |
+| 完了フィルター | 「すべて / 未完了 / 完了」タブで `filter` を切替えて `reload()` |
+| 完了済み一括削除 | 「完了を消す →」ボタンで `clearCompleted()` → DELETE `?completed=true` |
 
-### 10.3 app.js 構成
+### 10.3 `Alpine.data('todoApp')` の構成
 
 ```
 const API = '/api/v1/todos';
 
-loadTodos(filter)    ← GET    /api/v1/todos[?completed=]
-createTodo(title)    ← POST   /api/v1/todos
-toggleTodo(id, todo) ← PATCH  /api/v1/todos/{id}
-deleteTodo(id)       ← DELETE /api/v1/todos/{id}
-clearCompleted()     ← DELETE /api/v1/todos?completed=true
-renderTodos(list)    ← DOM 更新
+Alpine.data('todoApp', () => ({
+  // state
+  todos:    [],                          // 表示中の Todo 一覧
+  filter:   'all',                       // 'all' | 'active' | 'completed'
+  newTitle: '',                          // 入力中のタイトル
+  error:    null,                        // エラーメッセージ
+
+  // lifecycle
+  init() { this.reload(); },             // 初期描画
+
+  // メソッド（呼び出す API）
+  reload()         // GET    /api/v1/todos[?completed=true|false]   filter から組み立て
+  create()         // POST   /api/v1/todos                           { title: newTitle }
+  toggle(t)        // PATCH  /api/v1/todos/{t.id}                    { completed: !t.completed }
+  remove(id)       // DELETE /api/v1/todos/{id}
+  clearCompleted() // DELETE /api/v1/todos?completed=true
+
+  // 共通ハンドラ
+  handleError(res) // 4xx/5xx 応答を error にセット（ProblemDetail の detail を表示）
+}))
 ```
+
+UI 側は `index.html` の `x-data="todoApp"` 配下で、上記 state とメソッドを `x-model` / `@click` /
+`x-for` / `x-text` 等から参照する。`x-cloak` で初期描画前のチラつきを抑えている。
 
 ---
 
@@ -625,7 +648,7 @@ renderTodos(list)    ← DOM 更新
 | Mapper | `@MybatisTest` + 自動構成 H2 | DB 連動部分は本番に近い形（H2 への実 SQL 発行）で検証する。トランザクション境界はテストごとに自動ロールバック |
 | Service | JUnit 5 + Mockito + `Clock.fixed(...)` | ビジネスロジックを純粋に検証する。Mapper を `@Mock` で差し替え、時刻を固定して `created_at`/`updated_at` の挙動を観察する |
 | Controller | `RestTestClient.bindToController(...)` + `setControllerAdvice(...)` + Mockito | Web 層を **standalone** で起動（DispatcherServlet なし）。Service を `@Mock`、`GlobalExceptionHandler` を組み込み、Controller + ハンドラの協調をテストする |
-| 全体 | `@SpringBootTest` | エンドツーエンドのハッピーパスを少数だけ |
+| 結合（全体） | `@SpringBootTest(RANDOM_PORT)` + `@ActiveProfiles("test")` + `RestTestClient.bindToServer()` | 実サーバを起動し、`application-test.properties` の **in-memory H2** に対して実 HTTP で CRUD ハッピーパスを 1 本だけ流す。スライステストでは保証できない「Controller → Service → MyBatis → H2 の往復配線」を検証する |
 
 > **`@WebMvcTest + MockMvc` ではなく `RestTestClient` を採用する理由**:
 > Spring Framework 7 で導入された `RestTestClient` は WebTestClient 系の流れる API を持ち、
@@ -635,6 +658,17 @@ renderTodos(list)    ← DOM 更新
 > **`@MybatisTest` の DB に関する注意**: `@MybatisTest` はデフォルトで本番の DataSource を
 > in-memory の embedded DB に **置換** する。本番の file-based H2 とストレージモードが異なる点に留意。
 > 本番と同じ file-based DB でテストしたい場合は `@AutoConfigureTestDatabase(replace = Replace.NONE)` を併用する。
+>
+> **結合テストで in-memory H2 に差し替える理由**: 本番設定 (`jdbc:h2:file:./data/tododb`) を
+> そのまま使うとテスト実行で本番 DB ファイルが汚れる。`application-test.properties` で
+> `jdbc:h2:mem:tododb-it;DB_CLOSE_DELAY=-1` に上書きし、`@ActiveProfiles("test")` で読み込む。
+> `DB_CLOSE_DELAY=-1` は「最後の接続が閉じても JVM 終了まで DB を維持」するためのオプションで、
+> MyBatis のコネクションプールが接続を再取得した際にデータが消えるのを防ぐ。
+>
+> **Spring Boot 4 での結合テスト構成の注意**: Spring Boot 4 では `RestTestClient` の自動構成
+> （`@AutoConfigureRestTestClient`）が別モジュール (`spring-boot-resttestclient`) に分離された。
+> 依存を追加せずに済ませるため、本プロジェクトでは `@LocalServerPort` + `RestTestClient.bindToServer()`
+> で手動構築している。
 
 ---
 
