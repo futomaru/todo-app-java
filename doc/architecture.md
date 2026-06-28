@@ -18,7 +18,7 @@ Spring MVC / MyBatis / H2 を学習するためのシンプルなレイヤード
 ## 全体構成
 
 ```
-ブラウザ (static/index.html + app.js)
+ブラウザ (static/index.html + app.js [Alpine.js])
     │  fetch() → REST 呼び出し
     ▼
 TodoController (REST) → TodoService (@Transactional) → TodoMapper (@Mapper) → H2 (file-based)
@@ -78,7 +78,7 @@ io.github.futomaru.todoapp/
 | 並行処理 | Virtual Threads（`spring.threads.virtual.enabled=true`） |
 | null 表現 | JSpecify（`org.jspecify.annotations.@Nullable`） |
 | ボイラープレート削減 | Lombok（Entity のみ `@Getter` `@Setter` `@NoArgsConstructor`） |
-| フロントエンド | HTML / CSS / Vanilla JS |
+| フロントエンド | HTML / CSS / Alpine.js（CDN 読み込み） |
 | テスト | JUnit 5 / Mockito / `@MybatisTest` / `RestTestClient` |
 | ビルド | Gradle 9 |
 
